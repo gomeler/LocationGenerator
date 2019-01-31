@@ -1,0 +1,32 @@
+religious
+"abbey","temple","shrine","graveyard"
+
+government
+"townhall","palace","moot hall","embassy","post office"
+
+educational
+"archive","college","school","library"
+
+military
+"arsenal","barracks","prison","guardhouse"
+
+transport
+"stables","lighthouse","pier","shipyard"
+
+farm
+"barn","cow-shed","farmhouse","root cellar","stable","pigpen","chicken coop"
+
+housing
+"tavern","inn"
+
+entertainment
+"theater","amphitheater","arena","stadium","gambling house"
+
+fortifications
+"walls","towers","keep"
+
+healing
+"hospital","apothecary","hedge witch"
+
+industry
+"windmill","forge","blacksmith","woodworker","toolsmith","armorer","market","trade merchant"

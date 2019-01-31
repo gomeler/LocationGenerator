@@ -1,0 +1,105 @@
+Want to generate random towns filled with various structures and populated by NPCs.
+
+
+Determine the number of buildings desired via a random selection along some sort of array, perhaps fibonacci sequence?
+
+Roll for what types of structures are generated. Perhaps weight it with some sort of logical minimums required to create a reasonable town.
+
+I think we'll leave population generation to one-offs as needed pending adventuring.
+
+Architecture:
+
+Figure out how big the town will initially be. I think this is where the fibonacci sequence will come along, with recommended sizes that match an optional size argument.
+
+Once the size is determined, roll to determine the percentages of buildings that'll be of various types. Each type should likely have a hardcoded minimum and maximum limit, so we don't end up with towns featuring 100% prisons for example.
+
+Generic building struct that each specific type struct will implement. Some buildings will have a child struct that they can be replaced with.
+
+Building struct:
+	category String
+	name String
+	maximumPercentage Integer
+	childBuilding struct
+	childChance Integer
+
+Building Types
+
+Houses
+	townhouse
+	cottage
+	shack
+	hovel
+
+Medical Buildings
+	Hedge witch/wizard
+	Apothecary
+	Hospital
+
+Hospitality Buildings
+	Tavern
+	Inn
+	Hostel
+
+Travel Buildings
+	bridge
+	river
+	lighthouse
+	coast
+	
+Entertainment Buildings
+	ampitheatre
+	stadium
+	arena
+	opera house
+
+Religious Buildings
+	cathedral
+	church
+	abbey
+	nunnery
+	temple
+	shrine
+
+Government Buildings
+	library
+	townhall
+	moot building
+	assembly building
+	mayor's house
+	fort
+	castle
+	guard outpost
+	jail
+	prison
+	palace
+	town/city walls
+
+Light Industry Buildings
+	Pier
+	Blacksmith
+	Leatherworker
+	Butchershop
+	Bakery
+	Weaver
+	Machinist
+	Mason
+	Woodworker
+	general store
+
+Heavy Industry Buildings
+	Dock
+	harbor
+	Shipbuilder
+	Brickmaker
+	Forge
+	Furnace
+	Warehouse
+	Surface Mine
+	Sub-surface Mine
+
+
+
+	
+
+
+	
