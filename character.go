@@ -1,11 +1,11 @@
 package main
 
 import (
-	"./generators"
 	"fmt"
 	"strings"
-)
 
+	"./generators"
+)
 
 func main() {
 	race, err := generators.RandomRace()
@@ -23,10 +23,8 @@ func main() {
 
 }
 
-
 func errorHandler(err error) {
-        if err != nil {
-                panic(err)
-        }
+	if err != nil {
+		panic(err)
+	}
 }
-

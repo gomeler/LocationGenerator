@@ -103,3 +103,13 @@ Heavy Industry Buildings
 
 
 	
+Thoughts on weighted sorting:
+return the index of the selected item!
+
+
+Thoughts on location generation:
+1) randomly generate the quantity regarding buildings to be generated
+2) generate the buildings, adhering to the maximum quantity and maximum percentage values.
+	2a) evolve buildings, keeping the above in mind. If an evolution is illegal, roll back to the child vs re-rolling the buildings.
+
+I think for now it'll be safe to keep track of the buildings while evolving them via a simple name:quantity map. I don't need unique values for the various buildings, I think each building will be tailored/configured in another step. The first step is simply figuring out how large the town is.

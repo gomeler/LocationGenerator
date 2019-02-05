@@ -1,3 +1,0 @@
-package building
-
-func 
