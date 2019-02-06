@@ -58,6 +58,7 @@ type WeightedBuilding struct {
 	ChildChance       int
 	MaxQuantity       int
 	Weight            int
+	MinCityWeight     int //Some structures make no sense in certain sized locations. Castle at a farm?
 }
 
 type WeightedBuildings struct {

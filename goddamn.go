@@ -43,6 +43,10 @@ func main() {
 	//var b := Wolf{}
 	//var farm = Animals{a, b}
 	//Had a little confusion with pointers earlier.
+	var alpha [5]int = [5]int{0, 1, 2, 3, 4}
+	for i := 0; i < len(alpha); i++ {
+		fmt.Println(i)
+	}
 	m := &Mutable{0, 0}
 	fmt.Println(m)
 	m.StayTheSame()
