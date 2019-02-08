@@ -23,22 +23,23 @@ Building struct:
 	childChance Integer
 
 Building Types
+	Build(MinCityWeight)
 
 Houses
-	townhouse
+	townhouse(2)
 	cottage
 	shack
 	hovel
 
 Medical Buildings
 	Hedge witch/wizard
-	Apothecary
-	Hospital
+	Apothecary(2)
+	Hospital(3)
 
 Hospitality Buildings
-	Tavern
-	Inn
-	Hostel
+	Tavern(2)
+	Inn(2)
+	Hostel(2)
 
 Travel Buildings
 	bridge
@@ -47,32 +48,32 @@ Travel Buildings
 	coast
 	
 Entertainment Buildings
-	ampitheatre
-	stadium
-	arena
-	opera house
+	ampitheatre(4)
+	stadium(3)
+	arena(2)
+	opera house(3)
 
 Religious Buildings
-	cathedral
-	church
+	cathedral(3)
+	church(2)
 	abbey
 	nunnery
-	temple
+	temple(2)
 	shrine
 
 Government Buildings
-	library
-	townhall
-	moot building
-	assembly building
-	mayor's house
-	fort
-	castle
-	guard outpost
-	jail
-	prison
-	palace
-	town/city walls
+	library(3)
+	townhall(3)
+	moot building(3)
+	assembly building(2)
+	mayor's house(1)
+	fort(3)
+	castle(3)
+	guard outpost(2)
+	jail(2)
+	prison(3)
+	palace(3)
+	town/city walls(3)
 
 Light Industry Buildings
 	Pier

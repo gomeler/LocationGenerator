@@ -2,8 +2,6 @@ package generators
 
 import (
 	"errors"
-	"fmt"
-	"math"
 	"math/rand"
 	"time"
 )
@@ -95,35 +93,4 @@ func (wb *WeightedBuildings) RandomWeightedSelect() (int, error) {
 		}
 	}
 	return -1, errors.New("no item selected")
-}
-
-func (wb WeightedBuilding) EvolveBuilding(maxBuildings int, buildingMap map[string]int) WeightedBuilding {
-	//We receive a pointer to a WeightedBuilding with a childBuilding value. We then perform a roll to see if the childBuilding replaces the existing building. We return the child on success, otherwise we return the original value.
-	var randomSelect int = rand.Intn(100)
-	//var numExistingBuildings int //To be used
-	if wb.ChildChance > randomSelect {
-		//Success, evolution approved.
-		if wb.ChildBuilding.ChildBuilding == nil {
-			//No grandchild, verify there is room for the child
-			if wb.ChildBuilding.MaxQuantity != 0 {
-				if buildingMap[wb.ChildBuilding.Name]+1 > wb.ChildBuilding.MaxQuantity {
-					//we'll have too many buildings, evolution denied.
-					return wb
-				}
-			}
-			if float64(buildingMap[wb.ChildBuilding.Name]+1) > math.Round(float64(maxBuildings*(wb.ChildBuilding.MaximumPercentage/100))) {
-				//There is insufficient space.
-				return wb
-			}
-			//Passed all the checks, child can spawn.
-			fmt.Printf("Evolved %s to %s. ", wb.Name, wb.ChildBuilding.Name)
-			return *wb.ChildBuilding
-		} else {
-			//grandchild exists, need to evolve it.
-			fmt.Printf("Evolved %s to %s. ", wb.Name, wb.ChildBuilding.Name)
-			return wb.ChildBuilding.EvolveBuilding(maxBuildings, buildingMap)
-		}
-	}
-	//Failed to evolve.
-	return wb
 }
