@@ -62,15 +62,9 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]
 		building = selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, buildings)
 		fmt.Printf("Building selected: %s. ", building.Name)
 		//check if building has child, so we can potentially evolve.
-		if building.ChildBuilding != nil {
-			generatedBuilding = evolveBuilding(building, numBuildings, townWeight, buildings)
-		} else {
-			//perform space checks.
-			generatedBuilding = building
-		}
+		generatedBuilding = evolveBuildingLoop(building, numBuildings, townWeight, buildings)
 		buildings[generatedBuilding.Name] += 1
 		fmt.Printf("Added %s to the map.\n", generatedBuilding.Name)
-
 	}
 	fmt.Println(buildings)
 }
@@ -83,8 +77,8 @@ func selectBuilding(numBuildings int,
 	existingBuildings map[string]int,
 ) generators.WeightedBuilding {
 
-	var buildingTypeIdx int = rand.Intn(len(buildingTypes))
-	var buildingTypeName string = buildingTypes[buildingTypeIdx]
+	var buildingTypeIdx := rand.Intn(len(buildingTypes))
+	var buildingTypeName := buildingTypes[buildingTypeIdx]
 	var buildingName string
 	//Check to see if the selected type features a valid building for this townWeight
 	if verifyBuildingTypeValid(townWeight, buildingMap[buildingTypeName]) {
@@ -92,8 +86,7 @@ func selectBuilding(numBuildings int,
 		errorHandler(err)
 		buildingName = buildingMap[buildingTypeName].Buildings[buildingIdx].Name
 		//Now check to see if the building fits within the townWeight
-		if buildingMap[buildingTypeName].Buildings[buildingIdx].MinCityWeight <= townWeight ||
-			buildingMap[buildingTypeName].Buildings[buildingIdx].MinCityWeight == 0 {
+		if verifyTownWeight(buildingMap[buildingTypeName].Buildings[buildingIdx], townWeight) {
 			fmt.Printf("%s with weight %d fits in townWeight %d. ",
 				buildingName,
 				buildingMap[buildingTypeName].Buildings[buildingIdx].MinCityWeight,
@@ -121,14 +114,21 @@ func selectBuilding(numBuildings int,
 	return selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, existingBuildings)
 }
 
-//verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townWeight. This prevents a castle from spawning in a Farm location.
+//verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townWeight.
 func verifyBuildingTypeValid(townWeight int, buildingTypeArray *generators.WeightedBuildings) bool {
 	for i := 0; i < len(buildingTypeArray.Buildings); i++ {
-		if buildingTypeArray.Buildings[i].MinCityWeight <= townWeight ||
-			buildingTypeArray.Buildings[i].MinCityWeight == 0 {
-			//Most WeightedBuildings will not have a MinCityWeight value set, meaning they're valid for all locations.
+		if verifyTownWeight(buildingTypeArray.Buildings[i], townWeight) {
 			return true
 		}
+	}
+	return false
+}
+
+//verifyTownWeight checks that the given building fits within the town. No castles in farms.
+func verifyTownWeight(building generators.WeightedBuilding, townWeight int) bool {
+	if building.MinCityWeight <= townWeight || building.MinCityWeight == 0 {
+		//Most WeightedBuildings will not have a MinCityWeight value set, meaning they're valid for all locations.
+		return true
 	}
 	return false
 }
@@ -158,31 +158,42 @@ func verifyBuildingFits(building generators.WeightedBuilding,
 	return true
 }
 
-func evolveBuilding(wb generators.WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) generators.WeightedBuilding {
-	//Perform a roll to see if the childBuilding replaces the existing building. We return the child on success, otherwise we return the original value.
-	var randomSelect int = rand.Intn(100) + 1
-	if wb.ChildChance > randomSelect {
-		//Success, evolution approved. Check if a grandchild exists and shortcircuit to that check.
-		if wb.ChildBuilding.ChildBuilding == nil {
-			//No grandchild, verify there is room for the child. Make sure the child also fits in the town, no castles in farms.
-			fmt.Printf("Child evolution success: Evolved %s into %s. Checking if it fits. ", wb.Name, wb.ChildBuilding.Name)
-			if verifyBuildingFits(*wb.ChildBuilding, buildingMap, maxBuildings) && (wb.ChildBuilding.MinCityWeight <= townWeight ||
-				wb.ChildBuilding.MinCityWeight == 0) {
-				fmt.Printf("Child fits. ")
-				return *wb.ChildBuilding
-			}
-			fmt.Printf("Child does not fit, spawning parent. ")
-			return wb
-		} else {
-			//grandchild exists, need to evolve it.
-			//TODO: Need to handle the issue when there is no space for the child, there is space for the grandchild, and the child fails to evolve into the grandchild. This branch can yield more of a building than the limits dictate. Also should check if the grandchild can even fit in the town, can save some time if the evolution will auto-fail.
-			fmt.Printf("Evolved %s to %s, now checking to see if we'll spawn a %s. ", wb.Name, wb.ChildBuilding.Name, wb.ChildBuilding.ChildBuilding.Name)
-			return evolveBuilding(*wb.ChildBuilding, maxBuildings, townWeight, buildingMap)
+//evolveBuildingLoop is the second iteration of this evolution logic. I found it helpful to break apart the loop and upgrade logic. In some cases of chained evolutions, intermediate buildings don't necessarily need to fit, so we'll keep track of the most recent valid result and most recent evolution, and follow the evolutions to their conclusion.
+func evolveBuildingLoop(building generators.WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) generators.WeightedBuilding {
+	//We'll store both the most recent valid placement, and the most recent placement. Non-zero chance the most recent placement won't fit, but may have a child building that fits.
+	topBuilding := building //Best building that fits.
+	topEvolution := building //Best building regardless of fitment.
+	var continueEvolution = true
+	for continueEvolution && topEvolution.ChildBuilding != nil {
+		//Check if we succeed in another evolution.
+		continueEvolution, topEvolution = evolveBuildingCheck(topEvolution)
+		//Check if the topEvolution fits in the town.
+		if verifyBuildingFits(topEvolution, buildingMap, maxBuildings) &&
+			verifyTownWeight(topEvolution, townWeight) {
+			topBuilding = topEvolution
 		}
 	}
-	//Failed to evolve.
-	fmt.Printf("Failed to evolve %s to %s. ", wb.Name, wb.ChildBuilding.Name)
-	return wb
+	if topBuilding != topEvolution {
+		//This is strictly for my curiousity.
+		fmt.Printf("Turns out we rolled back %s to %s due to space. ", topEvolution.Name, topBuilding.Name)
+	}
+	return topBuilding
+
+}
+
+//evolveBuildingCheck is strictly the evolution logic needed for one generation of evolution.
+func evolveBuildingCheck(building generators.WeightedBuilding) (bool, generators.WeightedBuilding) {
+	var randomSelect int = rand.Intn(100) + 1
+	//Perform a roll to see if the childBuilding replaces the existing building. We return the child on success, otherwise we return the original value.
+	if building.ChildChance > randomSelect {
+		//Child evolution success, return the child.
+		fmt.Printf("Child evolution success: evolved %s into %s. ", building.Name, building.ChildBuilding.Name)
+		return true, *building.ChildBuilding
+	}
+	//Child evolution failure, we're done evolving things.
+	fmt.Printf("Child evolution failure for %s. ", building.Name)
+	return false, building
+
 }
 
 func errorHandler(err error) {
