@@ -1,4 +1,4 @@
-package main
+package generators
 
 import (
 	"fmt"
@@ -7,46 +7,44 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gomeler/LocationGenerator/generators"
-	//log "github.com/sirupsen/logrus"
 	"github.com/gomeler/LocationGenerator/logging"
 )
 
 var log = logging.New()
 
-func main() {
+func LocationEntry() {
 	/*adjective, err := generators.RandomAdjective()
 	errorHandler(err)
 	fmt.Println(adjective)*/
-	buildingMap := generators.AssembleBuildings()
+	buildingMap := AssembleBuildings()
 	rand.Seed(time.Now().UnixNano())
 	townSize := rand.Intn(4)
 	var numBuildings int
 	var townWeight int
 	switch townSize {
 	case 0: //We're generating a Farm
-		numBuildings = rand.Intn(generators.Farm.MaxBuildings-generators.Farm.MinBuildings) + generators.Farm.MinBuildings
+		numBuildings = rand.Intn(Farm.MaxBuildings-Farm.MinBuildings) + Farm.MinBuildings
 		log.Info("Making a farm")
-		townWeight = generators.Farm.Weight
+		townWeight = Farm.Weight
 	case 1: //We're generating a Hamlet
-		numBuildings = rand.Intn(generators.Hamlet.MaxBuildings-generators.Hamlet.MinBuildings) + generators.Hamlet.MinBuildings
+		numBuildings = rand.Intn(Hamlet.MaxBuildings-Hamlet.MinBuildings) + Hamlet.MinBuildings
 		log.Info("Making a hamlet")
-		townWeight = generators.Hamlet.Weight
+		townWeight = Hamlet.Weight
 	case 2: //We're generating a Town
-		numBuildings = rand.Intn(generators.Town.MaxBuildings-generators.Town.MinBuildings) + generators.Town.MinBuildings
+		numBuildings = rand.Intn(Town.MaxBuildings-Town.MinBuildings) + Town.MinBuildings
 		log.Info("Making a town")
-		townWeight = generators.Town.Weight
+		townWeight = Town.Weight
 	case 3: //We're generating a City
-		numBuildings = rand.Intn(generators.City.MaxBuildings-generators.City.MinBuildings) + generators.City.MinBuildings
+		numBuildings = rand.Intn(City.MaxBuildings-City.MinBuildings) + City.MinBuildings
 		log.Info("Making a city")
-		townWeight = generators.City.Weight
+		townWeight = City.Weight
 	}
 	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
 	generateBuildings(numBuildings, townWeight, buildingMap)
 
 }
 
-func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]*generators.WeightedBuildings) {
+func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]*WeightedBuildings) {
 	rand.Seed(time.Now().UnixNano())
 
 	//Keeping this logic outside of the main loop, we don't need to generate this array for each building.
@@ -59,8 +57,8 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]
 
 	//This is our farm/town/city. Might make it an array of pointers to the original buildings.
 	var buildings = make(map[string]int)
-	var building generators.WeightedBuilding
-	var generatedBuilding generators.WeightedBuilding
+	var building WeightedBuilding
+	var generatedBuilding WeightedBuilding
 	//loop to generate each building.
 	for i := 0; i < numBuildings; i++ {
 		building = selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, buildings)
@@ -76,10 +74,10 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]
 //selectBuildingType arose from needing to move the building selection logic out of the primary loop in the chance that no valid building for the location existed in the selected WeightedBuilding array.
 func selectBuilding(numBuildings int,
 	townWeight int,
-	buildingMap map[string]*generators.WeightedBuildings,
+	buildingMap map[string]*WeightedBuildings,
 	buildingTypes []string,
 	existingBuildings map[string]int,
-) generators.WeightedBuilding {
+) WeightedBuilding {
 
 	buildingTypeIdx := rand.Intn(len(buildingTypes))
 	buildingTypeName := buildingTypes[buildingTypeIdx]
@@ -110,7 +108,7 @@ func selectBuilding(numBuildings int,
 				"{NumBuildings}", fmt.Sprint(existingBuildings[buildingName]))
 			log.Info(r.Replace(message))
 		} else {
-			log.Info(fmt.Printf("%s does not fit in townWeight %d, rerolling.", buildingName, townWeight))
+			log.Info(fmt.Sprintf("%s does not fit in townWeight %d, rerolling.", buildingName, townWeight))
 			return selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, existingBuildings)
 		}
 	}
@@ -119,7 +117,7 @@ func selectBuilding(numBuildings int,
 }
 
 //verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townWeight.
-func verifyBuildingTypeValid(townWeight int, buildingTypeArray *generators.WeightedBuildings) bool {
+func verifyBuildingTypeValid(townWeight int, buildingTypeArray *WeightedBuildings) bool {
 	for i := 0; i < len(buildingTypeArray.Buildings); i++ {
 		if verifyTownWeight(buildingTypeArray.Buildings[i], townWeight) {
 			return true
@@ -129,7 +127,7 @@ func verifyBuildingTypeValid(townWeight int, buildingTypeArray *generators.Weigh
 }
 
 //verifyTownWeight checks that the given building fits within the town. No castles in farms.
-func verifyTownWeight(building generators.WeightedBuilding, townWeight int) bool {
+func verifyTownWeight(building WeightedBuilding, townWeight int) bool {
 	if building.MinCityWeight <= townWeight || building.MinCityWeight == 0 {
 		//Most WeightedBuildings will not have a MinCityWeight value set, meaning they're valid for all locations.
 		return true
@@ -138,7 +136,7 @@ func verifyTownWeight(building generators.WeightedBuilding, townWeight int) bool
 }
 
 //verifyBuildingFits checks to see if we haven't exceeded the MaximumPercentage and MaxQuantity values for the town and building combination.
-func verifyBuildingFits(building generators.WeightedBuilding,
+func verifyBuildingFits(building WeightedBuilding,
 	existingBuildings map[string]int,
 	maxBuildingCount int,
 ) bool {
@@ -163,7 +161,7 @@ func verifyBuildingFits(building generators.WeightedBuilding,
 }
 
 //evolveBuildingLoop is the second iteration of this evolution logic. I found it helpful to break apart the loop and upgrade logic. In some cases of chained evolutions, intermediate buildings don't necessarily need to fit, so we'll keep track of the most recent valid result and most recent evolution, and follow the evolutions to their conclusion.
-func evolveBuildingLoop(building generators.WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) generators.WeightedBuilding {
+func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) WeightedBuilding {
 	//We'll store both the most recent valid placement, and the most recent placement. Non-zero chance the most recent placement won't fit, but may have a child building that fits.
 	topBuilding := building  //Best building that fits.
 	topEvolution := building //Best building regardless of fitment.
@@ -186,7 +184,7 @@ func evolveBuildingLoop(building generators.WeightedBuilding, maxBuildings int, 
 }
 
 //evolveBuildingCheck is strictly the evolution logic needed for one generation of evolution.
-func evolveBuildingCheck(building generators.WeightedBuilding) (bool, generators.WeightedBuilding) {
+func evolveBuildingCheck(building WeightedBuilding) (bool, WeightedBuilding) {
 	randomSelect := rand.Intn(100) + 1
 	//Perform a roll to see if the childBuilding replaces the existing building. We return the child on success, otherwise we return the original value.
 	if building.ChildChance > randomSelect {

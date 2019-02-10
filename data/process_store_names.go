@@ -1,23 +1,17 @@
-package main
-
+package data
 
 import (
-	"./data"
 	"strings"
 )
 
 type Names struct {
-	MaleNameArray []string
+	MaleNameArray   []string
 	FemaleNameArray []string
 }
 
-const fileMaleNames string = "data/male2017top.cvs"
-const fileFemaleNames string = "data/female2017top.cvs"
-const fileNames string = "data/names.gob"
-
-func main() {
-	maleData, maleErr := data.Load(fileMaleNames)
-	femaleData, femaleErr := data.Load(fileFemaleNames)
+func NameMain() {
+	maleData, maleErr := Load(fileMaleNames)
+	femaleData, femaleErr := Load(fileFemaleNames)
 	errorHandler(maleErr)
 	errorHandler(femaleErr)
 	i := 0
@@ -37,22 +31,14 @@ func main() {
 	}
 
 	names := Names{
-		MaleNameArray: maleNames,
+		MaleNameArray:   maleNames,
 		FemaleNameArray: femaleNames,
 	}
 
-	err := data.WriteGob(fileNames, names)
+	err := WriteGob(fileNames, names)
 	errorHandler(err)
 
 	//loadedNames := new (Names)
 	//err = data.ReadGob("test.gob", loadedNames)
 
 }
-
-
-func errorHandler(err error) {
-        if err != nil {
-                panic(err)
-        }
-}
-

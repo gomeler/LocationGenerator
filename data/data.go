@@ -1,12 +1,20 @@
 package data
 
-
 import (
-	"os"
 	"bufio"
 	"encoding/gob"
+	"os"
 )
 
+const fileNouns string = "data/nouns.csv"
+const fileNounsStore string = "data/nouns.gob"
+
+const fileAdjectives string = "data/adjectives.csv"
+const fileAdjStore string = "data/adjectives.gob"
+
+const fileMaleNames string = "data/male2017top.cvs"
+const fileFemaleNames string = "data/female2017top.cvs"
+const fileNames string = "data/names.gob"
 
 func Load(filename string) ([]string, error) {
 	data, ingestError := loadFile(filename)

@@ -40,9 +40,3 @@ func pullName(gender string, nameStruct *Names) string {
 	}
 	return name
 }
-
-func errorHandler(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
