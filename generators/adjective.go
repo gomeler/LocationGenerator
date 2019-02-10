@@ -2,8 +2,9 @@ package generators
 
 import (
 	"math/rand"
-	"namegen/data"
 	"time"
+
+	"github.com/gomeler/LocationGenerator/data"
 )
 
 type Adjectives struct {

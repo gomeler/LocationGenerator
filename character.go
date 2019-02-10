@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"./generators"
+	"github.com/gomeler/LocationGenerator/generators"
+	"github.com/gomeler/LocationGenerator/logging"
 )
+
+var log = logging.New()
 
 func main() {
 	race, err := generators.RandomRace()
@@ -19,7 +22,8 @@ func main() {
 	name = strings.Replace(name, `"`, "", -1)
 	name = string(name[0]) + strings.ToLower(name[1:])
 
-	fmt.Printf("%s %s %s\n", gender, race, name)
+	//holy wow, we should use log.WithFields, should increase readability a bit.
+	log.Info(fmt.Sprintf("%s %s %s", gender, race, name))
 
 }
 

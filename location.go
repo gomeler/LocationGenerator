@@ -7,8 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"./generators"
+	"github.com/gomeler/LocationGenerator/generators"
+	//log "github.com/sirupsen/logrus"
+	"github.com/gomeler/LocationGenerator/logging"
 )
+
+var log = logging.New()
 
 func main() {
 	/*adjective, err := generators.RandomAdjective()
@@ -16,28 +20,28 @@ func main() {
 	fmt.Println(adjective)*/
 	buildingMap := generators.AssembleBuildings()
 	rand.Seed(time.Now().UnixNano())
-	var townSize int = rand.Intn(4)
+	townSize := rand.Intn(4)
 	var numBuildings int
 	var townWeight int
 	switch townSize {
 	case 0: //We're generating a Farm
 		numBuildings = rand.Intn(generators.Farm.MaxBuildings-generators.Farm.MinBuildings) + generators.Farm.MinBuildings
-		fmt.Println("Making a farm")
+		log.Info("Making a farm")
 		townWeight = generators.Farm.Weight
 	case 1: //We're generating a Hamlet
 		numBuildings = rand.Intn(generators.Hamlet.MaxBuildings-generators.Hamlet.MinBuildings) + generators.Hamlet.MinBuildings
-		fmt.Println("Making a hamlet")
+		log.Info("Making a hamlet")
 		townWeight = generators.Hamlet.Weight
 	case 2: //We're generating a Town
 		numBuildings = rand.Intn(generators.Town.MaxBuildings-generators.Town.MinBuildings) + generators.Town.MinBuildings
-		fmt.Println("Making a town")
+		log.Info("Making a town")
 		townWeight = generators.Town.Weight
 	case 3: //We're generating a City
 		numBuildings = rand.Intn(generators.City.MaxBuildings-generators.City.MinBuildings) + generators.City.MinBuildings
-		fmt.Println("Making a city")
+		log.Info("Making a city")
 		townWeight = generators.City.Weight
 	}
-	fmt.Printf("We're generating: %d buildings\n", numBuildings)
+	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
 	generateBuildings(numBuildings, townWeight, buildingMap)
 
 }
@@ -60,13 +64,13 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]
 	//loop to generate each building.
 	for i := 0; i < numBuildings; i++ {
 		building = selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, buildings)
-		fmt.Printf("Building selected: %s. ", building.Name)
+		log.Info(fmt.Sprintf("Building selected: %s.", building.Name))
 		//check if building has child, so we can potentially evolve.
 		generatedBuilding = evolveBuildingLoop(building, numBuildings, townWeight, buildings)
-		buildings[generatedBuilding.Name] += 1
-		fmt.Printf("Added %s to the map.\n", generatedBuilding.Name)
+		buildings[generatedBuilding.Name]++
+		log.Info(fmt.Sprintf("Added %s to the map.", generatedBuilding.Name))
 	}
-	fmt.Println(buildings)
+	log.Info(buildings)
 }
 
 //selectBuildingType arose from needing to move the building selection logic out of the primary loop in the chance that no valid building for the location existed in the selected WeightedBuilding array.
@@ -77,8 +81,8 @@ func selectBuilding(numBuildings int,
 	existingBuildings map[string]int,
 ) generators.WeightedBuilding {
 
-	var buildingTypeIdx := rand.Intn(len(buildingTypes))
-	var buildingTypeName := buildingTypes[buildingTypeIdx]
+	buildingTypeIdx := rand.Intn(len(buildingTypes))
+	buildingTypeName := buildingTypes[buildingTypeIdx]
 	var buildingName string
 	//Check to see if the selected type features a valid building for this townWeight
 	if verifyBuildingTypeValid(townWeight, buildingMap[buildingTypeName]) {
@@ -87,26 +91,26 @@ func selectBuilding(numBuildings int,
 		buildingName = buildingMap[buildingTypeName].Buildings[buildingIdx].Name
 		//Now check to see if the building fits within the townWeight
 		if verifyTownWeight(buildingMap[buildingTypeName].Buildings[buildingIdx], townWeight) {
-			fmt.Printf("%s with weight %d fits in townWeight %d. ",
+			log.Info(fmt.Sprintf("%s with weight %d fits in townWeight %d.",
 				buildingName,
 				buildingMap[buildingTypeName].Buildings[buildingIdx].MinCityWeight,
-				townWeight)
+				townWeight))
 			//Check to see if there is space in the town for the building.
 			if verifyBuildingFits(buildingMap[buildingTypeName].Buildings[buildingIdx],
 				existingBuildings, numBuildings) {
-				fmt.Printf("%s fits within the town. ", buildingName)
+				log.Info(fmt.Sprintf("%s fits within the town.", buildingName))
 				return buildingMap[buildingTypeName].Buildings[buildingIdx]
 			}
 			//Seriously just an excuse to test out strings.NewReplacer
-			message := "{Building} does not fit within the town, insufficient space. There is a max of {MaxBuilding} buildings, and {Building} has a MaximumQuantity of {MaxQuantity} and a MaxPercentage of {MaxPercentage} with {NumBuildings} current {Building}. "
+			message := "{Building} does not fit within the town, insufficient space. There is a max of {MaxBuilding} buildings, and {Building} has a MaximumQuantity of {MaxQuantity} and a MaxPercentage of {MaxPercentage} with {NumBuildings} current {Building}."
 			r := strings.NewReplacer("{Building}", buildingName,
 				"{MaxBuilding}", fmt.Sprint(numBuildings),
 				"{MaxQuantity}", fmt.Sprint(buildingMap[buildingTypeName].Buildings[buildingIdx].MaxQuantity),
 				"{MaxPercentage}", fmt.Sprint(buildingMap[buildingTypeName].Buildings[buildingIdx].MaximumPercentage),
 				"{NumBuildings}", fmt.Sprint(existingBuildings[buildingName]))
-			fmt.Printf(r.Replace(message))
+			log.Info(r.Replace(message))
 		} else {
-			fmt.Printf("%s does not fit in townWeight %d, rerolling. ", buildingName, townWeight)
+			log.Info(fmt.Printf("%s does not fit in townWeight %d, rerolling.", buildingName, townWeight))
 			return selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, existingBuildings)
 		}
 	}
@@ -141,7 +145,7 @@ func verifyBuildingFits(building generators.WeightedBuilding,
 	//Verify we won't exceed MaxQuantity. MaxQuantity is 0 by default, ignore those cases.
 	if building.MaxQuantity < (existingBuildings[building.Name]+1) &&
 		building.MaxQuantity != 0 {
-		fmt.Printf("%s failed MaxQuantity check with MaxQuantity of %d and %d already available. ", building.Name, building.MaxQuantity, existingBuildings[building.Name])
+		log.Info(fmt.Sprintf("%s failed MaxQuantity check with MaxQuantity of %d and %d already available.", building.Name, building.MaxQuantity, existingBuildings[building.Name]))
 		return false
 	}
 	//For exceedingly small locations a low MaximumPercentage basically means nothing spawns, so we'll loosen the limit and basically create a MinQuantity=1 by default.
@@ -152,7 +156,7 @@ func verifyBuildingFits(building generators.WeightedBuilding,
 	//Verify we won't exceed MaximumPercentage. MaximumPercentage is 0 by default, ignore those cases.
 	if int(math.Round(maxPercentageAppliedQuantity)) < (existingBuildings[building.Name]+1) &&
 		building.MaximumPercentage != 0 {
-		fmt.Printf("%s failed MaxPercentage check with MaxPercentage of %d, an applied maximumQuantity of %d, and %d already available. ", building.Name, building.MaximumPercentage, int(math.Round(maxPercentageAppliedQuantity)), existingBuildings[building.Name])
+		log.Info(fmt.Sprintf("%s failed MaxPercentage check with MaxPercentage of %d, an applied maximumQuantity of %d, and %d already available.", building.Name, building.MaximumPercentage, int(math.Round(maxPercentageAppliedQuantity)), existingBuildings[building.Name]))
 		return false
 	}
 	return true
@@ -161,7 +165,7 @@ func verifyBuildingFits(building generators.WeightedBuilding,
 //evolveBuildingLoop is the second iteration of this evolution logic. I found it helpful to break apart the loop and upgrade logic. In some cases of chained evolutions, intermediate buildings don't necessarily need to fit, so we'll keep track of the most recent valid result and most recent evolution, and follow the evolutions to their conclusion.
 func evolveBuildingLoop(building generators.WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) generators.WeightedBuilding {
 	//We'll store both the most recent valid placement, and the most recent placement. Non-zero chance the most recent placement won't fit, but may have a child building that fits.
-	topBuilding := building //Best building that fits.
+	topBuilding := building  //Best building that fits.
 	topEvolution := building //Best building regardless of fitment.
 	var continueEvolution = true
 	for continueEvolution && topEvolution.ChildBuilding != nil {
@@ -175,7 +179,7 @@ func evolveBuildingLoop(building generators.WeightedBuilding, maxBuildings int, 
 	}
 	if topBuilding != topEvolution {
 		//This is strictly for my curiousity.
-		fmt.Printf("Turns out we rolled back %s to %s due to space. ", topEvolution.Name, topBuilding.Name)
+		log.Info(fmt.Sprintf("Turns out we rolled back %s to %s due to space.", topEvolution.Name, topBuilding.Name))
 	}
 	return topBuilding
 
@@ -183,15 +187,15 @@ func evolveBuildingLoop(building generators.WeightedBuilding, maxBuildings int, 
 
 //evolveBuildingCheck is strictly the evolution logic needed for one generation of evolution.
 func evolveBuildingCheck(building generators.WeightedBuilding) (bool, generators.WeightedBuilding) {
-	var randomSelect int = rand.Intn(100) + 1
+	randomSelect := rand.Intn(100) + 1
 	//Perform a roll to see if the childBuilding replaces the existing building. We return the child on success, otherwise we return the original value.
 	if building.ChildChance > randomSelect {
 		//Child evolution success, return the child.
-		fmt.Printf("Child evolution success: evolved %s into %s. ", building.Name, building.ChildBuilding.Name)
+		log.Info(fmt.Sprintf("Child evolution success: evolved %s into %s.", building.Name, building.ChildBuilding.Name))
 		return true, *building.ChildBuilding
 	}
 	//Child evolution failure, we're done evolving things.
-	fmt.Printf("Child evolution failure for %s. ", building.Name)
+	log.Info(fmt.Sprintf("Child evolution failure for %s.", building.Name))
 	return false, building
 
 }
