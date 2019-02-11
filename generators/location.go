@@ -12,16 +12,15 @@ import (
 
 var log = logging.New()
 
-func LocationEntry() {
+func LocationEntry(townType int) {
 	/*adjective, err := generators.RandomAdjective()
 	errorHandler(err)
 	fmt.Println(adjective)*/
-	buildingMap := AssembleBuildings()
 	rand.Seed(time.Now().UnixNano())
-	townSize := rand.Intn(4)
+	buildingMap := AssembleBuildings()
 	var numBuildings int
 	var townWeight int
-	switch townSize {
+	switch townType {
 	case 0: //We're generating a Farm
 		numBuildings = rand.Intn(Farm.MaxBuildings-Farm.MinBuildings) + Farm.MinBuildings
 		log.Info("Making a farm")
@@ -41,7 +40,6 @@ func LocationEntry() {
 	}
 	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
 	generateBuildings(numBuildings, townWeight, buildingMap)
-
 }
 
 func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]*WeightedBuildings) {

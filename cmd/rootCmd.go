@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/gomeler/LocationGenerator/logging"
@@ -11,12 +10,9 @@ import (
 var log = logging.New()
 
 var rootCmd = &cobra.Command{
-	Use:   "location",
-	Short: "location is a simple tabletop RPG location generator",
+	Use:   "ttgen",
+	Short: "ttgen is a simple tabletop RPG location generator",
 	Long:  `blerg`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("test")
-	},
 }
 
 func Execute() {
