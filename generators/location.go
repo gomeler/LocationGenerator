@@ -1,6 +1,7 @@
 package generators
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -77,8 +78,8 @@ func selectBuilding(numBuildings int,
 	existingBuildings map[string]int,
 ) WeightedBuilding {
 
-	buildingTypeIdx := rand.Intn(len(buildingTypes))
-	buildingTypeName := buildingTypes[buildingTypeIdx]
+	buildingTypeName, err := weightedBuildingMapSelect(buildingMap)
+	errorHandler(err)
 	var buildingName string
 	//Check to see if the selected type features a valid building for this townWeight
 	if verifyBuildingTypeValid(townWeight, buildingMap[buildingTypeName]) {
@@ -112,6 +113,38 @@ func selectBuilding(numBuildings int,
 	}
 	//Going to make a potentially catastrophic assumption here and assume that the provided townWeight will eventually yield a building. In theory we'll just keep looping until we find a valid buildingType array that contains a building that fits within the townWeight value AND there is space for it in the existingBuilding map and the MaxQuantity/MaxPercentage checks.
 	return selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, existingBuildings)
+}
+
+//I think totalWeightBuildingMap and weightedBuildingMapSelect belong in the generators package.
+func totalWeightBuildingMap(buildingMap map[string]*WeightedBuildings) int {
+	var totalWeight int
+	for _, item := range buildingMap {
+		if item.Weight == 0 {
+			totalWeight += 10
+		} else {
+			totalWeight += item.Weight
+		}
+	}
+	return totalWeight
+}
+
+//weightedBuildingMapSelect exists to leverage the Weight attribute of the WeightedBuildings struct. Getting tired of equal weight selection yielding towns with zero housing.
+func weightedBuildingMapSelect(buildingMap map[string]*WeightedBuildings) (string, error) {
+	totalWeight := totalWeightBuildingMap(buildingMap)
+	rand.Seed(time.Now().UnixNano())
+	r := rand.Intn(totalWeight)
+	for category, wb := range buildingMap {
+		//More default weight magic.
+		if wb.Weight == 0 {
+			r -= 10
+		} else {
+			r -= wb.Weight
+		}
+		if r <= 0 {
+			return category, nil
+		}
+	}
+	return "", errors.New("Failed to select building category")
 }
 
 //verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townWeight.

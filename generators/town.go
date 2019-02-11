@@ -11,7 +11,7 @@ type Location struct {
 	Weight       int
 }
 
-var Farm = Location{"Farm", 1, 9, 1}
-var Hamlet = Location{"Hamlet", 5, 25, 2}
+var Farm = Location{"Farm", 3, 12, 1}
+var Hamlet = Location{"Hamlet", 8, 35, 2}
 var Town = Location{"Hamlet", 50, 100, 3}
 var City = Location{"City", 100, 1000, 4}

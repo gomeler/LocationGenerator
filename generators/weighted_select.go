@@ -59,8 +59,10 @@ type WeightedBuilding struct {
 	MinCityWeight     int //Some structures make no sense in certain sized locations. Castle at a farm?
 }
 
+//At some point rename this, too similar to WeightedBuilding. Maybe WeightedBuildingArray?
 type WeightedBuildings struct {
 	Buildings []WeightedBuilding
+	Weight    int
 }
 
 func (wb *WeightedBuildings) TotalWeight() int {
