@@ -7,11 +7,12 @@ import (
 
 //var log = logging.New()
 
-func CharacterEntry() {
-	race, err := RandomRace()
+func CharacterEntry(characterRaceFlag string, characterGenderFlag string) {
+	//Right now races and genders exist primarily as a simple string. I could in theory just hand back the given flags, but there is a non-zero chance something else will happen with these facets of the generator, so I'll stick with going through the entire stack.
+	race, err := RandomRace(characterRaceFlag)
 	errorHandler(err)
 
-	gender, err := RandomGender()
+	gender, err := RandomGender(characterGenderFlag)
 	errorHandler(err)
 
 	name, err := RandomName(gender)

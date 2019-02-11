@@ -2,7 +2,7 @@ package generators
 
 //gender_race contains the base data used for generating a random gender and race. I think maybe there'll be various presets for race/gender in the future.
 
-var races = []WeightedItem{
+var Races = []WeightedItem{
 	WeightedItem{Name: "Human", Weight: 125},
 	WeightedItem{Name: "Dragonborn", Weight: 5},
 	WeightedItem{Name: "Dwarf", Weight: 30},
@@ -18,29 +18,49 @@ var races = []WeightedItem{
 	WeightedItem{Name: "Half Giant", Weight: 1},
 }
 
-var weightedRaces = SimpleWeightedItems{items: races}
+var weightedRaces = SimpleWeightedItems{items: Races}
 
-var genders = []WeightedItem{
+var Genders = []WeightedItem{
 	WeightedItem{Name: "Male", Weight: 50},
 	WeightedItem{Name: "Female", Weight: 50},
 }
 
-var weightedGenders = SimpleWeightedItems{items: genders}
+var weightedGenders = SimpleWeightedItems{items: Genders}
 
+//TODO: RandomRace and RandomGender are identical, merge with a new input.
 //RandomRace performs a weighted select against the array of races provided above.
-func RandomRace() (string, error) {
-	index, err := weightedRaces.RandomWeightedSelect()
-	if err == nil {
-		return weightedRaces.items[index].Name, err
+func RandomRace(characterRaceFlag string) (string, error) {
+	if characterRaceFlag == "random" {
+		index, err := weightedRaces.RandomWeightedSelect()
+		if err == nil {
+			return weightedRaces.items[index].Name, err
+		}
+		return "", err
+	} else {
+		//Kick back the flag for now.
+		return characterRaceFlag, nil
 	}
-	return "", err
 }
 
 //RandomGender performs a weighted select against the array of genders provided above.
-func RandomGender() (string, error) {
-	index, err := weightedGenders.RandomWeightedSelect()
-	if err == nil {
-		return weightedGenders.items[index].Name, err
+func RandomGender(characterGenderFlag string) (string, error) {
+	if characterGenderFlag == "random" {
+		index, err := weightedGenders.RandomWeightedSelect()
+		if err == nil {
+			return weightedGenders.items[index].Name, err
+		}
+		return "", err
+	} else {
+		//Kick back the flag for now.
+		return characterGenderFlag, nil
 	}
-	return "", err
+}
+
+//RaceNames exists primarily for input validation.
+func WeightedItemNames(things []WeightedItem) []string {
+	var names []string
+	for _, thing := range things {
+		names = append(names, thing.Name)
+	}
+	return names
 }

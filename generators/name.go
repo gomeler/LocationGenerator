@@ -2,6 +2,7 @@ package generators
 
 import (
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/gomeler/LocationGenerator/data"
@@ -30,8 +31,9 @@ func RandomName(gender string) (string, error) {
 func pullName(gender string, nameStruct *Names) string {
 	var name string
 	var idx int
-	switch gender {
-	case "Male":
+	//Will need to eventually uniformly settle on a capitalization for gender and race.
+	switch strings.ToLower(gender) {
+	case "male":
 		idx = rand.Intn(len(nameStruct.MaleNameArray) - 1)
 		name = nameStruct.MaleNameArray[idx]
 	default:
