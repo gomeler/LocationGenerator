@@ -6,93 +6,75 @@ import (
 	"time"
 )
 
-//WeightedArray in theory will form the basis for several weighted datatypes. I'm not sure if this was necessary though, might have unnecessarily complicated things.
-type WeightedArray interface {
-	TotalWeight() int                     //typically just used by RandomWeightedSelect
-	RandomWeightedSelected() (int, error) //returns index of selected item.
-}
-
 //WeightedItem is used for a generic weighted select where only a name is needed.
 type WeightedItem struct {
 	Name   string
 	Weight int
 }
 
-//SimpleWeightedItems is a basic collection for WeightedItems.
-type SimpleWeightedItems struct {
-	items []WeightedItem
+type WeightedItemCollection struct {
+	WeightedItem
+	Items []WeightedItem
 }
-
-//TotalWeight right now is solely used by RandomWeightedSelect, but I might find another use?
-func (wr *SimpleWeightedItems) TotalWeight() int {
-	var totalWeight int
-	for _, item := range wr.items {
-		totalWeight += item.Weight
-	}
-	return totalWeight
-}
-
-//RandomWeightedSelect is the basis for weighted random selection in this entire thing. It's kind of a big deal.
-func (wr *SimpleWeightedItems) RandomWeightedSelect() (int, error) {
-	totalWeight := wr.TotalWeight()
-	rand.Seed(time.Now().UnixNano())
-	r := rand.Intn(totalWeight)
-	for index, item := range wr.items {
-		r -= item.Weight
-		if r <= 0 {
-			return index, nil
-		}
-	}
-	return -1, errors.New("no item selected")
-}
-
-//Building related stuff. I think now that I'm just returning indices, I should have a single generic selector and type specific processors.
 
 type WeightedBuilding struct {
-	category          string
-	Name              string
+	WeightedItem
+	Category          string
 	MaximumPercentage int
 	ChildBuilding     *WeightedBuilding
 	ChildChance       int
 	MaxQuantity       int
-	Weight            int
 	MinCityWeight     int //Some structures make no sense in certain sized locations. Castle at a farm?
 }
 
-//At some point rename this, too similar to WeightedBuilding. Maybe WeightedBuildingArray?
-type WeightedBuildings struct {
+type WeightedBuildingCollection struct {
+	WeightedItem
 	Buildings []WeightedBuilding
-	Weight    int
 }
 
-func (wb *WeightedBuildings) TotalWeight() int {
+func (item *WeightedItem) getWeight() int {
+	if item.Weight == 0 {
+		return 10
+	}
+	return item.Weight
+}
+
+func ItemsTotalWeight(items []WeightedItem) int {
 	var totalWeight int
-	for _, item := range wb.Buildings {
-		//Some building types have no weight, we'll default to 10 for all.
-		if item.Weight == 0 {
-			totalWeight += 10
-		} else {
-		}
-		totalWeight += item.Weight
+	for _, item := range items {
+		totalWeight += item.getWeight()
 	}
 	return totalWeight
 }
 
-//RandomWeightedSelect is the basis for weighted random selection in this entire thing. It's kind of a big deal.
-func (wb *WeightedBuildings) RandomWeightedSelect() (int, error) {
-	totalWeight := wb.TotalWeight()
+func RandomWeightedSelect(items []WeightedItem) (int, error) {
+	totalWeight := ItemsTotalWeight(items)
 	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(totalWeight)
-	for index, item := range wb.Buildings {
-		//Some building types have no weight, we'll default to 10 for all.
-		if item.Weight == 0 {
-			r -= 10
-		} else {
-			r -= item.Weight
-		}
+	for index, item := range items {
+		r -= item.getWeight()
 		if r <= 0 {
 			return index, nil
 		}
 	}
 	return -1, errors.New("no item selected")
+}
+
+//WeightedBuildingCollectionRandomWeightedSelect is a wrapper that processes an array of buildingCollections to feed it to our generic TotalWeight and RandomWeightedSelection functions. This adds some silly wrappers in an attempt to minimize code duplication.
+func WeightedBuildingCollectionRandomWeightedSelect(buildingCollections []*WeightedBuildingCollection) (int, error) {
+	//My understand is initializing the slice to the known length is more efficient/faster than appending to a zero length slice.
+	items := make([]WeightedItem, len(buildingCollections))
+	//Extract the WeightedItems from the buildingCollections so we can do some generic selection work.
+	for idx, collection := range buildingCollections {
+		items[idx] = collection.WeightedItem
+	}
+	return RandomWeightedSelect(items)
+}
+
+func BuildingsRandomWeightedSelect(buildings []WeightedBuilding) (int, error) {
+	items := make([]WeightedItem, len(buildings))
+	for idx, collection := range buildings {
+		items[idx] = collection.WeightedItem
+	}
+	return RandomWeightedSelect(items)
 }

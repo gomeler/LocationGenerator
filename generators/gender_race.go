@@ -18,22 +18,18 @@ var Races = []WeightedItem{
 	WeightedItem{Name: "Half Giant", Weight: 1},
 }
 
-var weightedRaces = SimpleWeightedItems{items: Races}
-
 var Genders = []WeightedItem{
 	WeightedItem{Name: "Male", Weight: 50},
 	WeightedItem{Name: "Female", Weight: 50},
 }
 
-var weightedGenders = SimpleWeightedItems{items: Genders}
-
 //TODO: RandomRace and RandomGender are identical, merge with a new input.
 //RandomRace performs a weighted select against the array of races provided above.
 func RandomRace(characterRaceFlag string) (string, error) {
 	if characterRaceFlag == "random" {
-		index, err := weightedRaces.RandomWeightedSelect()
+		index, err := RandomWeightedSelect(Races)
 		if err == nil {
-			return weightedRaces.items[index].Name, err
+			return Races[index].Name, err
 		}
 		return "", err
 	} else {
@@ -45,9 +41,9 @@ func RandomRace(characterRaceFlag string) (string, error) {
 //RandomGender performs a weighted select against the array of genders provided above.
 func RandomGender(characterGenderFlag string) (string, error) {
 	if characterGenderFlag == "random" {
-		index, err := weightedGenders.RandomWeightedSelect()
+		index, err := RandomWeightedSelect(Genders)
 		if err == nil {
-			return weightedGenders.items[index].Name, err
+			return Genders[index].Name, err
 		}
 		return "", err
 	} else {
@@ -56,7 +52,7 @@ func RandomGender(characterGenderFlag string) (string, error) {
 	}
 }
 
-//RaceNames exists primarily for input validation.
+//WeightedItemNames exists primarily for input validation.
 func WeightedItemNames(things []WeightedItem) []string {
 	var names []string
 	for _, thing := range things {
