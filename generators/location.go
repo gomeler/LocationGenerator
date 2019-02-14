@@ -1,7 +1,6 @@
 package generators
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -43,16 +42,8 @@ func LocationEntry(townType int) {
 	generateBuildings(numBuildings, townWeight, buildingMap)
 }
 
-func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]*WeightedBuildings) {
+func generateBuildings(numBuildings int, townWeight int, buildingMap []*WeightedBuildingCollection) {
 	rand.Seed(time.Now().UnixNano())
-
-	//Keeping this logic outside of the main loop, we don't need to generate this array for each building.
-	buildingTypes := make([]string, len(buildingMap))
-	i := 0
-	for k := range buildingMap {
-		buildingTypes[i] = k
-		i++
-	}
 
 	//This is our farm/town/city. Might make it an array of pointers to the original buildings.
 	var buildings = make(map[string]int)
@@ -60,7 +51,7 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]
 	var generatedBuilding WeightedBuilding
 	//loop to generate each building.
 	for i := 0; i < numBuildings; i++ {
-		building = selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, buildings)
+		building = selectBuilding(numBuildings, townWeight, buildingMap, buildings)
 		log.Info(fmt.Sprintf("Building selected: %s.", building.Name))
 		//check if building has child, so we can potentially evolve.
 		generatedBuilding = evolveBuildingLoop(building, numBuildings, townWeight, buildings)
@@ -73,82 +64,49 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap map[string]
 //selectBuildingType arose from needing to move the building selection logic out of the primary loop in the chance that no valid building for the location existed in the selected WeightedBuilding array.
 func selectBuilding(numBuildings int,
 	townWeight int,
-	buildingMap map[string]*WeightedBuildings,
-	buildingTypes []string,
+	buildingCollections []*WeightedBuildingCollection,
 	existingBuildings map[string]int,
 ) WeightedBuilding {
 
-	buildingTypeName, err := weightedBuildingMapSelect(buildingMap)
+	buildingCollectionIdx, err := WeightedBuildingCollectionRandomWeightedSelect(buildingCollections)
 	errorHandler(err)
-	var buildingName string
-	//Check to see if the selected type features a valid building for this townWeight
-	if verifyBuildingTypeValid(townWeight, buildingMap[buildingTypeName]) {
-		buildingIdx, err := buildingMap[buildingTypeName].RandomWeightedSelect()
+	var candidateBuilding WeightedBuilding
+	//Check to see if the selected buildingCollection features a valid building for this townWeight
+	if verifyBuildingTypeValid(townWeight, buildingCollections[buildingCollectionIdx]) {
+		buildingIdx, err := BuildingsRandomWeightedSelect(buildingCollections[buildingCollectionIdx].Buildings)
 		errorHandler(err)
-		buildingName = buildingMap[buildingTypeName].Buildings[buildingIdx].Name
-		//Now check to see if the building fits within the townWeight
-		if verifyTownWeight(buildingMap[buildingTypeName].Buildings[buildingIdx], townWeight) {
+		candidateBuilding = buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
+		//Now check to see if the selected building fits within the townWeight. We could avoid this check by feeding BuildingsRandomWeightedSelect with the townWeight so we don't select an invalid option.
+		if verifyTownWeight(candidateBuilding, townWeight) {
 			log.Info(fmt.Sprintf("%s with weight %d fits in townWeight %d.",
-				buildingName,
-				buildingMap[buildingTypeName].Buildings[buildingIdx].MinCityWeight,
+				candidateBuilding.Name,
+				candidateBuilding.MinCityWeight,
 				townWeight))
 			//Check to see if there is space in the town for the building.
-			if verifyBuildingFits(buildingMap[buildingTypeName].Buildings[buildingIdx],
+			if verifyBuildingFits(buildingCollections[buildingCollectionIdx].Buildings[buildingIdx],
 				existingBuildings, numBuildings) {
-				log.Info(fmt.Sprintf("%s fits within the town.", buildingName))
-				return buildingMap[buildingTypeName].Buildings[buildingIdx]
+				log.Info(fmt.Sprintf("%s fits within the town.", candidateBuilding.Name))
+				return buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
 			}
 			//Seriously just an excuse to test out strings.NewReplacer
 			message := "{Building} does not fit within the town, insufficient space. There is a max of {MaxBuilding} buildings, and {Building} has a MaximumQuantity of {MaxQuantity} and a MaxPercentage of {MaxPercentage} with {NumBuildings} current {Building}."
-			r := strings.NewReplacer("{Building}", buildingName,
+			r := strings.NewReplacer("{Building}", candidateBuilding.Name,
 				"{MaxBuilding}", fmt.Sprint(numBuildings),
-				"{MaxQuantity}", fmt.Sprint(buildingMap[buildingTypeName].Buildings[buildingIdx].MaxQuantity),
-				"{MaxPercentage}", fmt.Sprint(buildingMap[buildingTypeName].Buildings[buildingIdx].MaximumPercentage),
-				"{NumBuildings}", fmt.Sprint(existingBuildings[buildingName]))
+				"{MaxQuantity}", fmt.Sprint(candidateBuilding.MaxQuantity),
+				"{MaxPercentage}", fmt.Sprint(candidateBuilding.MaximumPercentage),
+				"{NumBuildings}", fmt.Sprint(existingBuildings[candidateBuilding.Name]))
 			log.Info(r.Replace(message))
 		} else {
-			log.Info(fmt.Sprintf("%s does not fit in townWeight %d, rerolling.", buildingName, townWeight))
-			return selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, existingBuildings)
+			log.Info(fmt.Sprintf("%s does not fit in townWeight %d, rerolling.", candidateBuilding.Name, townWeight))
+			return selectBuilding(numBuildings, townWeight, buildingCollections, existingBuildings)
 		}
 	}
 	//Going to make a potentially catastrophic assumption here and assume that the provided townWeight will eventually yield a building. In theory we'll just keep looping until we find a valid buildingType array that contains a building that fits within the townWeight value AND there is space for it in the existingBuilding map and the MaxQuantity/MaxPercentage checks.
-	return selectBuilding(numBuildings, townWeight, buildingMap, buildingTypes, existingBuildings)
-}
-
-//I think totalWeightBuildingMap and weightedBuildingMapSelect belong in the generators package.
-func totalWeightBuildingMap(buildingMap map[string]*WeightedBuildings) int {
-	var totalWeight int
-	for _, item := range buildingMap {
-		if item.Weight == 0 {
-			totalWeight += 10
-		} else {
-			totalWeight += item.Weight
-		}
-	}
-	return totalWeight
-}
-
-//weightedBuildingMapSelect exists to leverage the Weight attribute of the WeightedBuildings struct. Getting tired of equal weight selection yielding towns with zero housing.
-func weightedBuildingMapSelect(buildingMap map[string]*WeightedBuildings) (string, error) {
-	totalWeight := totalWeightBuildingMap(buildingMap)
-	rand.Seed(time.Now().UnixNano())
-	r := rand.Intn(totalWeight)
-	for category, wb := range buildingMap {
-		//More default weight magic.
-		if wb.Weight == 0 {
-			r -= 10
-		} else {
-			r -= wb.Weight
-		}
-		if r <= 0 {
-			return category, nil
-		}
-	}
-	return "", errors.New("Failed to select building category")
+	return selectBuilding(numBuildings, townWeight, buildingCollections, existingBuildings)
 }
 
 //verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townWeight.
-func verifyBuildingTypeValid(townWeight int, buildingTypeArray *WeightedBuildings) bool {
+func verifyBuildingTypeValid(townWeight int, buildingTypeArray *WeightedBuildingCollection) bool {
 	for i := 0; i < len(buildingTypeArray.Buildings); i++ {
 		if verifyTownWeight(buildingTypeArray.Buildings[i], townWeight) {
 			return true
@@ -211,7 +169,6 @@ func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight 
 		log.Info(fmt.Sprintf("Turns out we rolled back %s to %s due to space.", topEvolution.Name, topBuilding.Name))
 	}
 	return topBuilding
-
 }
 
 //evolveBuildingCheck is strictly the evolution logic needed for one generation of evolution.
@@ -226,7 +183,6 @@ func evolveBuildingCheck(building WeightedBuilding) (bool, WeightedBuilding) {
 	//Child evolution failure, we're done evolving things.
 	log.Info(fmt.Sprintf("Child evolution failure for %s.", building.Name))
 	return false, building
-
 }
 
 func errorHandler(err error) {
