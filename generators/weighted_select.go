@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 //WeightedItem is used for a generic weighted select where only a name is needed.
 type WeightedItem struct {
 	Name   string
@@ -49,7 +53,6 @@ func ItemsTotalWeight(items []WeightedItem) int {
 
 func RandomWeightedSelect(items []WeightedItem) (int, error) {
 	totalWeight := ItemsTotalWeight(items)
-	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(totalWeight)
 	for index, item := range items {
 		r -= item.getWeight()
