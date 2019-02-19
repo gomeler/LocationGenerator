@@ -29,6 +29,9 @@ type WeightedBuilding struct {
 	ChildChance       int
 	MaxQuantity       int
 	MinCityWeight     int //Some structures make no sense in certain sized locations. Castle at a farm?
+	MinNumEmployees   int //Bummed there is no native tuple support in Go.
+	MaxNumEmployees   int
+	HasOwner          bool
 }
 
 type WeightedBuildingCollection struct {

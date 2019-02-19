@@ -12,6 +12,14 @@ import (
 
 var log = logging.New()
 
+type PopulatedBuilding struct {
+	BaseBuilding    *WeightedBuilding
+	Owner           NPC
+	Employees       []NPC
+	NonNPCEmployees int
+	//Should probably account for things like wealth and inventory at some point.
+}
+
 func LocationEntry(townType int) {
 	/*adjective, err := generators.RandomAdjective()
 	errorHandler(err)
@@ -20,45 +28,85 @@ func LocationEntry(townType int) {
 	buildingMap := AssembleBuildings()
 	var numBuildings int
 	var townWeight int
+	var location Location
 	switch townType {
 	case 0: //We're generating a Farm
 		numBuildings = rand.Intn(Farm.MaxBuildings-Farm.MinBuildings) + Farm.MinBuildings
 		log.Info("Making a farm")
 		townWeight = Farm.Weight
+		location = Farm
 	case 1: //We're generating a Hamlet
 		numBuildings = rand.Intn(Hamlet.MaxBuildings-Hamlet.MinBuildings) + Hamlet.MinBuildings
 		log.Info("Making a hamlet")
 		townWeight = Hamlet.Weight
+		location = Hamlet
 	case 2: //We're generating a Town
 		numBuildings = rand.Intn(Town.MaxBuildings-Town.MinBuildings) + Town.MinBuildings
 		log.Info("Making a town")
 		townWeight = Town.Weight
+		location = Town
 	case 3: //We're generating a City
 		numBuildings = rand.Intn(City.MaxBuildings-City.MinBuildings) + City.MinBuildings
 		log.Info("Making a city")
 		townWeight = City.Weight
+		location = City
 	}
 	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
-	generateBuildings(numBuildings, townWeight, buildingMap)
+	town := generateBuildings(numBuildings, townWeight, buildingMap)
+	log.Info(town)
+	housing := make([]string, 4)
+	housing[0] = "townhouse"
+	housing[1] = "cottage"
+	housing[2] = "shack"
+	housing[3] = "hovel"
+	for _, building := range town {
+		//log.Info(*building.BaseBuilding)
+		populateBuilding(&building, location.PeoplePerBuilding, location.NPCRatio)
+		owner := fmt.Sprintf("%s %s %s %d", building.Owner.Name, building.Owner.Gender, building.Owner.Race, building.Owner.Age)
+		if stringInSlice(building.BaseBuilding.Name, housing) {
+			//pass
+		} else {
+			log.Info(fmt.Sprintf("Building: %s - Owner: %s - Num Employees: %d", building.BaseBuilding.Name, owner, building.NonNPCEmployees))
+			if building.Employees != nil {
+				for _, employee := range building.Employees {
+					e := fmt.Sprintf("%s %s %s %d", employee.Name, employee.Gender, employee.Race, employee.Age)
+					log.Info(fmt.Sprintf("Subemployee: %s", e))
+				}
+			}
+		}
+	}
+
 }
 
-func generateBuildings(numBuildings int, townWeight int, buildingMap []*WeightedBuildingCollection) {
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
+func generateBuildings(numBuildings int, townWeight int, buildingMap []*WeightedBuildingCollection) []PopulatedBuilding {
 	rand.Seed(time.Now().UnixNano())
 
-	//This is our farm/town/city. Might make it an array of pointers to the original buildings.
+	//buildings will be used for fitment checks. I think it'll be more efficient to track building quantities in a separate map vs having to iterate over the array of buildings and extract their type.
 	var buildings = make(map[string]int)
-	var building WeightedBuilding
-	var generatedBuilding WeightedBuilding
+	var discreteBuildings = make([]PopulatedBuilding, numBuildings)
+	var building *WeightedBuilding
+	var generatedBuilding *WeightedBuilding
 	//loop to generate each building.
 	for i := 0; i < numBuildings; i++ {
 		building = selectBuilding(numBuildings, townWeight, buildingMap, buildings)
 		log.Info(fmt.Sprintf("Building selected: %s.", building.Name))
 		//check if building has child, so we can potentially evolve.
-		generatedBuilding = evolveBuildingLoop(building, numBuildings, townWeight, buildings)
+		generatedBuilding = evolveBuildingLoop(*building, numBuildings, townWeight, buildings)
 		buildings[generatedBuilding.Name]++
 		log.Info(fmt.Sprintf("Added %s to the map.", generatedBuilding.Name))
+		discreteBuildings[i] = PopulatedBuilding{BaseBuilding: generatedBuilding}
 	}
 	log.Info(buildings)
+	return discreteBuildings
 }
 
 //selectBuildingType arose from needing to move the building selection logic out of the primary loop in the chance that no valid building for the location existed in the selected WeightedBuilding array.
@@ -66,7 +114,7 @@ func selectBuilding(numBuildings int,
 	townWeight int,
 	buildingCollections []*WeightedBuildingCollection,
 	existingBuildings map[string]int,
-) WeightedBuilding {
+) *WeightedBuilding {
 
 	buildingCollectionIdx, err := WeightedBuildingCollectionRandomWeightedSelect(buildingCollections)
 	errorHandler(err)
@@ -86,7 +134,7 @@ func selectBuilding(numBuildings int,
 			if verifyBuildingFits(buildingCollections[buildingCollectionIdx].Buildings[buildingIdx],
 				existingBuildings, numBuildings) {
 				log.Info(fmt.Sprintf("%s fits within the town.", candidateBuilding.Name))
-				return buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
+				return &buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
 			}
 			//Seriously just an excuse to test out strings.NewReplacer
 			message := "{Building} does not fit within the town, insufficient space. There is a max of {MaxBuilding} buildings, and {Building} has a MaximumQuantity of {MaxQuantity} and a MaxPercentage of {MaxPercentage} with {NumBuildings} current {Building}."
@@ -150,7 +198,7 @@ func verifyBuildingFits(building WeightedBuilding,
 }
 
 //evolveBuildingLoop is the second iteration of this evolution logic. I found it helpful to break apart the loop and upgrade logic. In some cases of chained evolutions, intermediate buildings don't necessarily need to fit, so we'll keep track of the most recent valid result and most recent evolution, and follow the evolutions to their conclusion.
-func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) WeightedBuilding {
+func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) *WeightedBuilding {
 	//We'll store both the most recent valid placement, and the most recent placement. Non-zero chance the most recent placement won't fit, but may have a child building that fits.
 	topBuilding := building  //Best building that fits.
 	topEvolution := building //Best building regardless of fitment.
@@ -168,7 +216,7 @@ func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight 
 		//This is strictly for my curiousity.
 		log.Info(fmt.Sprintf("Turns out we rolled back %s to %s due to space.", topEvolution.Name, topBuilding.Name))
 	}
-	return topBuilding
+	return &topBuilding
 }
 
 //evolveBuildingCheck is strictly the evolution logic needed for one generation of evolution.
@@ -183,6 +231,27 @@ func evolveBuildingCheck(building WeightedBuilding) (bool, WeightedBuilding) {
 	//Child evolution failure, we're done evolving things.
 	log.Info(fmt.Sprintf("Child evolution failure for %s.", building.Name))
 	return false, building
+}
+
+func populateBuilding(building *PopulatedBuilding, peoplePerBuilding int, townNPCRatio float64) {
+	if building.BaseBuilding.HasOwner {
+		building.Owner = CharacterAttachment("random", "random")
+	}
+	//Determine number of employees
+	var numEmployees int
+	if building.BaseBuilding.MaxNumEmployees != 0 && building.BaseBuilding.MinNumEmployees != 0 {
+		numEmployees = rand.Intn(building.BaseBuilding.MaxNumEmployees+1-building.BaseBuilding.MinNumEmployees) + building.BaseBuilding.MinNumEmployees
+		numNPCs := int(math.Round(float64(numEmployees) * townNPCRatio))
+		if numNPCs > 0 {
+			for idx := 0; idx < numNPCs; idx++ {
+				building.Employees = append(building.Employees, CharacterAttachment("random", "random"))
+			}
+
+		} else {
+			//feature a random chance to spawn a singular NPC employee. Check to make sure we won't exceed min/max employee counts.
+		}
+		building.NonNPCEmployees = numEmployees - numNPCs
+	}
 }
 
 func errorHandler(err error) {
