@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 //WeightedItem is used for a generic weighted select where only a name is needed.
 type WeightedItem struct {
 	Name   string
@@ -25,6 +29,9 @@ type WeightedBuilding struct {
 	ChildChance       int
 	MaxQuantity       int
 	MinCityWeight     int //Some structures make no sense in certain sized locations. Castle at a farm?
+	MinNumEmployees   int //Bummed there is no native tuple support in Go.
+	MaxNumEmployees   int
+	HasOwner          bool
 }
 
 type WeightedBuildingCollection struct {
@@ -49,7 +56,6 @@ func ItemsTotalWeight(items []WeightedItem) int {
 
 func RandomWeightedSelect(items []WeightedItem) (int, error) {
 	totalWeight := ItemsTotalWeight(items)
-	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(totalWeight)
 	for index, item := range items {
 		r -= item.getWeight()

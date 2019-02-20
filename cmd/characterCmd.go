@@ -23,8 +23,8 @@ var characterCmd = &cobra.Command{
 	Short: "Generate a character",
 	Run: func(cmd *cobra.Command, args []string) {
 		//Do better flag validation via looping.
-		if flagValidator(characterRaceFlag, generators.Races) {
-			if flagValidator(characterGenderFlag, generators.Genders) {
+		if raceFlagValidator(characterRaceFlag, generators.AssembleRaces()) {
+			if genderFlagValidator(characterGenderFlag, generators.Genders) {
 				//Awww yiss, the flags are valid.
 				generators.CharacterEntry(characterRaceFlag, characterGenderFlag)
 			} else {
@@ -40,7 +40,15 @@ var characterCmd = &cobra.Command{
 	},
 }
 
-func flagValidator(flagInput string, weightedItems []generators.WeightedItem) bool {
+func raceFlagValidator(flagInput string, races []generators.Race) bool {
+	var validItems = make([]generators.WeightedItem, len(races))
+	for idx, race := range races {
+		validItems[idx] = race.WeightedItem
+	}
+	return genderFlagValidator(flagInput, validItems)
+}
+
+func genderFlagValidator(flagInput string, weightedItems []generators.WeightedItem) bool {
 	validItems := generators.WeightedItemNames(weightedItems)
 	validItems = append(validItems, "random")
 	for _, val := range validItems {

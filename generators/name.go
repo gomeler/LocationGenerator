@@ -1,6 +1,7 @@
 package generators
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -39,6 +40,10 @@ func pullName(gender string, nameStruct *Names) string {
 	default:
 		idx = rand.Intn(len(nameStruct.FemaleNameArray) - 1)
 		name = nameStruct.FemaleNameArray[idx]
+	}
+	if len(name) == 0 {
+		fmt.Println("Hit a zero length name.")
+		name = pullName(gender, nameStruct)
 	}
 	return name
 }
