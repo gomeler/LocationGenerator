@@ -20,7 +20,7 @@ type PopulatedBuilding struct {
 	//Should probably account for things like wealth and inventory at some point.
 }
 
-func LocationEntry(townType int) {
+func LocationEntry(townType int) []*PopulatedBuilding {
 	/*adjective, err := generators.RandomAdjective()
 	errorHandler(err)
 	fmt.Println(adjective)*/
@@ -52,30 +52,12 @@ func LocationEntry(townType int) {
 		location = City
 	}
 	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
-	town := generateBuildings(numBuildings, townWeight, buildingMap)
-	log.Info(town)
-	housing := make([]string, 4)
-	housing[0] = "townhouse"
-	housing[1] = "cottage"
-	housing[2] = "shack"
-	housing[3] = "hovel"
-	for _, building := range town {
-		//log.Info(*building.BaseBuilding)
-		populateBuilding(&building, location.PeoplePerBuilding, location.NPCRatio)
-		owner := fmt.Sprintf("%s %s %s %d", building.Owner.Name, building.Owner.Gender, building.Owner.Race, building.Owner.Age)
-		if stringInSlice(building.BaseBuilding.Name, housing) {
-			//pass
-		} else {
-			log.Info(fmt.Sprintf("Building: %s - Owner: %s - Num Employees: %d", building.BaseBuilding.Name, owner, building.NonNPCEmployees))
-			if building.Employees != nil {
-				for _, employee := range building.Employees {
-					e := fmt.Sprintf("%s %s %s %d", employee.Name, employee.Gender, employee.Race, employee.Age)
-					log.Info(fmt.Sprintf("Subemployee: %s", e))
-				}
-			}
-		}
+	spawnedLocation := generateBuildings(numBuildings, townWeight, buildingMap)
+	//Go about populating the buildings. For the most part housing won't have any NPCs, businesses will have an owner and 0,n employees. Buildings will also have a small chance at spawning a random NPC just for giggles if they don't generate one via the town NPC ratio check.
+	for _, building := range spawnedLocation {
+		populateBuilding(building, location.PeoplePerBuilding, location.NPCRatio)
 	}
-
+	return spawnedLocation
 }
 
 func stringInSlice(a string, list []string) bool {
@@ -87,12 +69,12 @@ func stringInSlice(a string, list []string) bool {
 	return false
 }
 
-func generateBuildings(numBuildings int, townWeight int, buildingMap []*WeightedBuildingCollection) []PopulatedBuilding {
+func generateBuildings(numBuildings int, townWeight int, buildingMap []*WeightedBuildingCollection) []*PopulatedBuilding {
 	rand.Seed(time.Now().UnixNano())
 
 	//buildings will be used for fitment checks. I think it'll be more efficient to track building quantities in a separate map vs having to iterate over the array of buildings and extract their type.
 	var buildings = make(map[string]int)
-	var discreteBuildings = make([]PopulatedBuilding, numBuildings)
+	var discreteBuildings = make([]*PopulatedBuilding, numBuildings)
 	var building *WeightedBuilding
 	var generatedBuilding *WeightedBuilding
 	//loop to generate each building.
@@ -103,7 +85,7 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap []*Weighted
 		generatedBuilding = evolveBuildingLoop(*building, numBuildings, townWeight, buildings)
 		buildings[generatedBuilding.Name]++
 		log.Info(fmt.Sprintf("Added %s to the map.", generatedBuilding.Name))
-		discreteBuildings[i] = PopulatedBuilding{BaseBuilding: generatedBuilding}
+		discreteBuildings[i] = &PopulatedBuilding{BaseBuilding: generatedBuilding}
 	}
 	log.Info(buildings)
 	return discreteBuildings
@@ -233,25 +215,44 @@ func evolveBuildingCheck(building WeightedBuilding) (bool, WeightedBuilding) {
 	return false, building
 }
 
-func populateBuilding(building *PopulatedBuilding, peoplePerBuilding int, townNPCRatio float64) {
+//Breaking up building population generation for testing purposes.
+func spawnOwnerForBuilding(building *PopulatedBuilding) {
+	//This is a pretty simple task. Buildings have a bool flag that dictates if they have an owner.
 	if building.BaseBuilding.HasOwner {
 		building.Owner = CharacterAttachment("random", "random")
 	}
-	//Determine number of employees
+}
+
+func spawnEmployeesForBuilding(building *PopulatedBuilding, peoplePerBuilding int, townNPCRatio float64) {
+	//Some buildings will have min/max employee ranges. Otherwise we'll use the town's default value.
 	var numEmployees int
 	if building.BaseBuilding.MaxNumEmployees != 0 && building.BaseBuilding.MinNumEmployees != 0 {
 		numEmployees = rand.Intn(building.BaseBuilding.MaxNumEmployees+1-building.BaseBuilding.MinNumEmployees) + building.BaseBuilding.MinNumEmployees
-		numNPCs := int(math.Round(float64(numEmployees) * townNPCRatio))
-		if numNPCs > 0 {
-			for idx := 0; idx < numNPCs; idx++ {
-				building.Employees = append(building.Employees, CharacterAttachment("random", "random"))
-			}
-
-		} else {
-			//feature a random chance to spawn a singular NPC employee. Check to make sure we won't exceed min/max employee counts.
-		}
-		building.NonNPCEmployees = numEmployees - numNPCs
+	} else {
+		numEmployees = rand.Intn(peoplePerBuilding + 1)
 	}
+	//Of the employees generated, some of them will be spawned as full NPCs.
+	numNPCs := int(math.Round(float64(numEmployees) * townNPCRatio))
+	//log.Info(fmt.Sprintf("%s will have %d employees, of which %d will be NPCs.", building.BaseBuilding.Name, numEmployees, numNPCs))
+	building.NonNPCEmployees = numEmployees - numNPCs
+	if numNPCs > 0 {
+		for idx := 0; idx < numNPCs; idx++ {
+			building.Employees = append(building.Employees, CharacterAttachment("random", "random"))
+		}
+	} else {
+		//Feature a random chance to spawn a singular NPC employee. This exists as a second chance of sorts so towns don't end up simply with building owners and otherwise empty buildings. Check to make sure we won't exceed min/max employee counts.
+		if rand.Intn(100) > 84 && numEmployees < building.BaseBuilding.MaxNumEmployees {
+			building.Employees = append(building.Employees, CharacterAttachment("random", "random"))
+		}
+	}
+}
+
+func populateBuilding(building *PopulatedBuilding, peoplePerBuilding int, townNPCRatio float64) {
+	//spawnOwnerForBuilding contains an internal check to determine if a building has an owner.
+	spawnOwnerForBuilding(building)
+
+	//spawnEmployeesForBuilding spawns NPC and non-NPC employees per the building's provided parameters. Otherwise it works against the default values provided by the town.
+	spawnEmployeesForBuilding(building, peoplePerBuilding, townNPCRatio)
 }
 
 func errorHandler(err error) {

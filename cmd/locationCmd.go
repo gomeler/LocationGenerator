@@ -41,7 +41,8 @@ var locationCmd = &cobra.Command{
 			log.Fatal(msg)
 			panic(msg)
 		}
-		generators.LocationEntry(locationType)
+		location := generators.LocationEntry(locationType)
+		logLocation(location)
 	},
 }
 
@@ -54,4 +55,31 @@ func locationTypeValidator(flagInput string) bool {
 		}
 	}
 	return false
+}
+
+func logLocation(location []*generators.PopulatedBuilding) {
+	//Going to need a prettyprint option for this.
+	log.Info("Num buildings: ", len(location))
+	var numPeople int
+	var numNPCs int
+	for _, building := range location {
+		log.Info("Building: ", building.BaseBuilding.Name)
+		if building.Owner.Name != "" {
+			owner := fmt.Sprintf("%s %s %s %d", building.Owner.Name, building.Owner.Gender, building.Owner.Race, building.Owner.Age)
+			log.Info(fmt.Sprintf("Owner: %s", owner))
+			numPeople++
+			numNPCs++
+		}
+		if building.Employees != nil {
+			for _, employee := range building.Employees {
+				e := fmt.Sprintf("%s %s %s %d", employee.Name, employee.Gender, employee.Race, employee.Age)
+				log.Info(fmt.Sprintf("Subemployee: %s", e))
+				numNPCs++
+			}
+			numPeople += len(building.Employees)
+		}
+		log.Info(fmt.Sprintf("Number of non-NPCs: %d", building.NonNPCEmployees))
+		numPeople += building.NonNPCEmployees
+	}
+	log.Info(fmt.Sprintf("%d people in this location, %d NPCs", numPeople, numNPCs))
 }
