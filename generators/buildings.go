@@ -1,5 +1,11 @@
 package generators
 
+import (
+	"LocationGenerator/config"
+	"encoding/json"
+	"io/ioutil"
+)
+
 const (
 	House         string = "house"
 	Government    string = "government"
@@ -12,8 +18,27 @@ const (
 	Entertainment string = "entertainment"
 )
 
+var TheBuildings []*WeightedBuildingCollection
+
+func init() {
+	ReloadBuildingFile("")
+}
+
+//ReloadBuildingFile can be used to reload an on-disk file of building structs. We have a default file provided in the config package, but I think we'll also have some location specific building configurations that we'd like to dynamically load.
+func ReloadBuildingFile(filename string) {
+	if filename == "" {
+		//Empty string = load the project provided default.
+		filename = config.BuildingConfig
+	}
+	loadedFile, err := ioutil.ReadFile(filename)
+	errorHandler(err)
+	json.Unmarshal(loadedFile, &TheBuildings)
+	RelinkChildBuildings(TheBuildings)
+}
+
 //TODO: might also want to add a feature where if a certain building spawns, it increases the chances of related buildings spawning.
 
+//AssembleBuildings has been deprecated with the addition of loading configs via JSON files provided in the config package. Leaving AssembleBuildings and the associated hard-coded functions in the project for now, to be deleted at a future point.
 func AssembleBuildings() []*WeightedBuildingCollection {
 	buildings := make([]*WeightedBuildingCollection, 9)
 	buildings[0] = buildHouses()
