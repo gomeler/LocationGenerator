@@ -1,6 +1,7 @@
 package generators
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -12,10 +13,45 @@ import (
 
 //The age related values in Race are used to configure a massaged normally distributed range with a minimum value. The idea is that this is a cheap/easy way to provide reasonable age generation without yielding things like an age of -42 years.
 type Race struct {
-	WeightedItem
-	ageMean        float64
-	ageSigma       float64
-	ageSigmaFactor float64
+	WeightedItem   `json:"-"`
+	ageMean        float64 `json:"-"`
+	ageSigma       float64 `json:"-"`
+	ageSigmaFactor float64 `json:"-"`
+}
+
+func (race Race) MarshalJSON() ([]byte, error) {
+	return json.Marshal(NewJSONRace(race))
+}
+
+func (race *Race) UnmarshalJSON(data []byte) error {
+	var jsonRace JSONRace
+	if err := json.Unmarshal(data, &jsonRace); err != nil {
+		return err
+	}
+	*race = jsonRace.Race()
+	return nil
+}
+
+func NewJSONRace(race Race) JSONRace {
+	return JSONRace{race.WeightedItem.Name, race.WeightedItem.Weight, race.ageMean, race.ageSigma, race.ageSigmaFactor}
+}
+
+type JSONRace struct {
+	Name           string  `json:"name"`
+	Weight         int     `json:"weight"`
+	AgeMean        float64 `json:"ageMean"`
+	AgeSigma       float64 `json:"ageSigma"`
+	AgeSigmaFactor float64 `json:"ageSigmaFactor"`
+}
+
+func (jsonRace JSONRace) Race() Race {
+	race := Race{}
+	race.WeightedItem.Name = jsonRace.Name
+	race.WeightedItem.Weight = jsonRace.Weight
+	race.ageMean = jsonRace.AgeMean
+	race.ageSigma = jsonRace.AgeSigma
+	race.ageSigmaFactor = jsonRace.AgeSigmaFactor
+	return race
 }
 
 //Should AssembleRaces be in an init value?
