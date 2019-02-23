@@ -25,7 +25,7 @@ func LocationEntry(townType int) []*PopulatedBuilding {
 	errorHandler(err)
 	fmt.Println(adjective)*/
 	rand.Seed(time.Now().UnixNano())
-	buildingMap := AssembleBuildings()
+	//buildingMap := AssembleBuildings()
 	var numBuildings int
 	var townWeight int
 	var location Location
@@ -52,7 +52,7 @@ func LocationEntry(townType int) []*PopulatedBuilding {
 		location = City
 	}
 	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
-	spawnedLocation := generateBuildings(numBuildings, townWeight, buildingMap)
+	spawnedLocation := generateBuildings(numBuildings, townWeight, TheBuildings)
 	//Go about populating the buildings. For the most part housing won't have any NPCs, businesses will have an owner and 0,n employees. Buildings will also have a small chance at spawning a random NPC just for giggles if they don't generate one via the town NPC ratio check.
 	for _, building := range spawnedLocation {
 		populateBuilding(building, location.PeoplePerBuilding, location.NPCRatio)
