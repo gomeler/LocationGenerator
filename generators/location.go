@@ -1,9 +1,13 @@
 package generators
 
 import (
+	"LocationGenerator/config"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -11,6 +15,34 @@ import (
 )
 
 var log = logging.New()
+
+type Location struct {
+	WeightedItem
+	MinBuildings      int
+	MaxBuildings      int
+	GrowthFactor      float64 //To be used with events to age location.
+	NPCRatio          float64 //Ratio designed to reduce the number of pre-generated NPCs. To be adjusted in the future.
+	PeoplePerBuilding int     //Settling on 8 people/building unless defined in the building type.
+	TownTier          int
+}
+
+//TheLocations consists of a map of available locations. On init we'll load a default value that can be configured by the CLI, or programmatically from other functions. Not sure if we should have these global values present, seems like a good way to cause a mistake.
+var TheLocations = make(map[string]Location)
+
+func init() {
+	ReloadLocationFile("")
+}
+
+//ReloadLocationFile loads the default location config file when passed an empty string. Otherwise it loads the file it is pointed to and replaces TheLocations variable with the new content.
+func ReloadLocationFile(filename string) {
+	if filename == "" {
+		//Empty string = load the project provided default.
+		filename = config.LocationConfig
+	}
+	loadedFile, err := ioutil.ReadFile(filename)
+	errorHandler(err)
+	json.Unmarshal(loadedFile, &TheLocations)
+}
 
 type PopulatedBuilding struct {
 	BaseBuilding    *WeightedBuilding
@@ -20,44 +52,50 @@ type PopulatedBuilding struct {
 	//Should probably account for things like wealth and inventory at some point.
 }
 
-func LocationEntry(townType int) []*PopulatedBuilding {
+func LocationEntry(locationName string) []*PopulatedBuilding {
 	/*adjective, err := generators.RandomAdjective()
 	errorHandler(err)
 	fmt.Println(adjective)*/
 	rand.Seed(time.Now().UnixNano())
-	//buildingMap := AssembleBuildings()
 	var numBuildings int
-	var townWeight int
-	var location Location
-	switch townType {
-	case 0: //We're generating a Farm
-		numBuildings = rand.Intn(Farm.MaxBuildings-Farm.MinBuildings) + Farm.MinBuildings
-		log.Info("Making a farm")
-		townWeight = Farm.Weight
-		location = Farm
-	case 1: //We're generating a Hamlet
-		numBuildings = rand.Intn(Hamlet.MaxBuildings-Hamlet.MinBuildings) + Hamlet.MinBuildings
-		log.Info("Making a hamlet")
-		townWeight = Hamlet.Weight
-		location = Hamlet
-	case 2: //We're generating a Town
-		numBuildings = rand.Intn(Town.MaxBuildings-Town.MinBuildings) + Town.MinBuildings
-		log.Info("Making a town")
-		townWeight = Town.Weight
-		location = Town
-	case 3: //We're generating a City
-		numBuildings = rand.Intn(City.MaxBuildings-City.MinBuildings) + City.MinBuildings
-		log.Info("Making a city")
-		townWeight = City.Weight
-		location = City
-	}
+	location, error := selectLocation(locationName)
+	log.Info("Making a ", location.Name)
+	errorHandler(error)
+	numBuildings = rand.Intn(location.MaxBuildings-location.MinBuildings) + location.MinBuildings
 	log.Info(fmt.Sprintf("We're generating: %d buildings.", numBuildings))
-	spawnedLocation := generateBuildings(numBuildings, townWeight, TheBuildings)
+	spawnedLocation := generateBuildings(numBuildings, location.TownTier, TheBuildings)
 	//Go about populating the buildings. For the most part housing won't have any NPCs, businesses will have an owner and 0,n employees. Buildings will also have a small chance at spawning a random NPC just for giggles if they don't generate one via the town NPC ratio check.
 	for _, building := range spawnedLocation {
 		populateBuilding(building, location.PeoplePerBuilding, location.NPCRatio)
 	}
 	return spawnedLocation
+}
+
+func GetLocationNames() []string {
+	locationNames := make([]string, len(TheLocations))
+	var idx int
+	for key := range TheLocations {
+		locationNames[idx] = key
+		idx++
+	}
+	return locationNames
+}
+
+//SelectRandomLocation will pull a random location from TheLocations, not factoring any weighting.
+func SelectRandomLocation() Location {
+	var locationNames = GetLocationNames()
+	var idx int = rand.Intn(len(locationNames) + 1)
+	return TheLocations[locationNames[idx]]
+}
+
+func selectLocation(locationName string) (Location, error) {
+	if locationName == "random" {
+		return SelectRandomLocation(), nil
+	}
+	if location, ok := TheLocations[locationName]; ok {
+		return location, nil
+	}
+	return Location{}, fmt.Errorf("Failed to match location name %s", locationName)
 }
 
 func stringInSlice(a string, list []string) bool {
@@ -69,7 +107,7 @@ func stringInSlice(a string, list []string) bool {
 	return false
 }
 
-func generateBuildings(numBuildings int, townWeight int, buildingMap []*WeightedBuildingCollection) []*PopulatedBuilding {
+func generateBuildings(numBuildings int, townTier int, buildingMap []*WeightedBuildingCollection) []*PopulatedBuilding {
 	rand.Seed(time.Now().UnixNano())
 
 	//buildings will be used for fitment checks. I think it'll be more efficient to track building quantities in a separate map vs having to iterate over the array of buildings and extract their type.
@@ -79,10 +117,10 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap []*Weighted
 	var generatedBuilding *WeightedBuilding
 	//loop to generate each building.
 	for i := 0; i < numBuildings; i++ {
-		building = selectBuilding(numBuildings, townWeight, buildingMap, buildings)
+		building = selectBuilding(numBuildings, townTier, buildingMap, buildings)
 		log.Info(fmt.Sprintf("Building selected: %s.", building.Name))
 		//check if building has child, so we can potentially evolve.
-		generatedBuilding = evolveBuildingLoop(*building, numBuildings, townWeight, buildings)
+		generatedBuilding = evolveBuildingLoop(*building, numBuildings, townTier, buildings)
 		buildings[generatedBuilding.Name]++
 		log.Info(fmt.Sprintf("Added %s to the map.", generatedBuilding.Name))
 		discreteBuildings[i] = &PopulatedBuilding{BaseBuilding: generatedBuilding}
@@ -93,7 +131,7 @@ func generateBuildings(numBuildings int, townWeight int, buildingMap []*Weighted
 
 //selectBuildingType arose from needing to move the building selection logic out of the primary loop in the chance that no valid building for the location existed in the selected WeightedBuilding array.
 func selectBuilding(numBuildings int,
-	townWeight int,
+	townTier int,
 	buildingCollections []*WeightedBuildingCollection,
 	existingBuildings map[string]int,
 ) *WeightedBuilding {
@@ -101,17 +139,17 @@ func selectBuilding(numBuildings int,
 	buildingCollectionIdx, err := WeightedBuildingCollectionRandomWeightedSelect(buildingCollections)
 	errorHandler(err)
 	var candidateBuilding WeightedBuilding
-	//Check to see if the selected buildingCollection features a valid building for this townWeight
-	if verifyBuildingTypeValid(townWeight, buildingCollections[buildingCollectionIdx]) {
+	//Check to see if the selected buildingCollection features a valid building for this townTier
+	if verifyBuildingTypeValid(townTier, buildingCollections[buildingCollectionIdx]) {
 		buildingIdx, err := BuildingsRandomWeightedSelect(buildingCollections[buildingCollectionIdx].Buildings)
 		errorHandler(err)
 		candidateBuilding = buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
-		//Now check to see if the selected building fits within the townWeight. We could avoid this check by feeding BuildingsRandomWeightedSelect with the townWeight so we don't select an invalid option.
-		if verifyTownWeight(candidateBuilding, townWeight) {
-			log.Info(fmt.Sprintf("%s with weight %d fits in townWeight %d.",
+		//Now check to see if the selected building fits within the townTier. We could avoid this check by feeding BuildingsRandomWeightedSelect with the townTier so we don't select an invalid option.
+		if verifytownTier(candidateBuilding, townTier) {
+			log.Info(fmt.Sprintf("%s with tier %d fits in townTier %d.",
 				candidateBuilding.Name,
 				candidateBuilding.MinCityWeight,
-				townWeight))
+				townTier))
 			//Check to see if there is space in the town for the building.
 			if verifyBuildingFits(buildingCollections[buildingCollectionIdx].Buildings[buildingIdx],
 				existingBuildings, numBuildings) {
@@ -127,27 +165,27 @@ func selectBuilding(numBuildings int,
 				"{NumBuildings}", fmt.Sprint(existingBuildings[candidateBuilding.Name]))
 			log.Info(r.Replace(message))
 		} else {
-			log.Info(fmt.Sprintf("%s does not fit in townWeight %d, rerolling.", candidateBuilding.Name, townWeight))
-			return selectBuilding(numBuildings, townWeight, buildingCollections, existingBuildings)
+			log.Info(fmt.Sprintf("%s does not fit in townTier %d, rerolling.", candidateBuilding.Name, townTier))
+			return selectBuilding(numBuildings, townTier, buildingCollections, existingBuildings)
 		}
 	}
-	//Going to make a potentially catastrophic assumption here and assume that the provided townWeight will eventually yield a building. In theory we'll just keep looping until we find a valid buildingType array that contains a building that fits within the townWeight value AND there is space for it in the existingBuilding map and the MaxQuantity/MaxPercentage checks.
-	return selectBuilding(numBuildings, townWeight, buildingCollections, existingBuildings)
+	//Going to make a potentially catastrophic assumption here and assume that the provided townTier will eventually yield a building. In theory we'll just keep looping until we find a valid buildingType array that contains a building that fits within the townTier value AND there is space for it in the existingBuilding map and the MaxQuantity/MaxPercentage checks.
+	return selectBuilding(numBuildings, townTier, buildingCollections, existingBuildings)
 }
 
-//verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townWeight.
-func verifyBuildingTypeValid(townWeight int, buildingTypeArray *WeightedBuildingCollection) bool {
+//verifyBuildingTypeValid checks to see if the array of buildings to be selected from contains at least one option that will work with the given townTier.
+func verifyBuildingTypeValid(townTier int, buildingTypeArray *WeightedBuildingCollection) bool {
 	for i := 0; i < len(buildingTypeArray.Buildings); i++ {
-		if verifyTownWeight(buildingTypeArray.Buildings[i], townWeight) {
+		if verifytownTier(buildingTypeArray.Buildings[i], townTier) {
 			return true
 		}
 	}
 	return false
 }
 
-//verifyTownWeight checks that the given building fits within the town. No castles in farms.
-func verifyTownWeight(building WeightedBuilding, townWeight int) bool {
-	if building.MinCityWeight <= townWeight || building.MinCityWeight == 0 {
+//verifytownTier checks that the given building fits within the town. No castles in farms.
+func verifytownTier(building WeightedBuilding, townTier int) bool {
+	if building.MinCityWeight <= townTier || building.MinCityWeight == 0 {
 		//Most WeightedBuildings will not have a MinCityWeight value set, meaning they're valid for all locations.
 		return true
 	}
@@ -180,7 +218,7 @@ func verifyBuildingFits(building WeightedBuilding,
 }
 
 //evolveBuildingLoop is the second iteration of this evolution logic. I found it helpful to break apart the loop and upgrade logic. In some cases of chained evolutions, intermediate buildings don't necessarily need to fit, so we'll keep track of the most recent valid result and most recent evolution, and follow the evolutions to their conclusion.
-func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight int, buildingMap map[string]int) *WeightedBuilding {
+func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townTier int, buildingMap map[string]int) *WeightedBuilding {
 	//We'll store both the most recent valid placement, and the most recent placement. Non-zero chance the most recent placement won't fit, but may have a child building that fits.
 	topBuilding := building  //Best building that fits.
 	topEvolution := building //Best building regardless of fitment.
@@ -190,7 +228,7 @@ func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townWeight 
 		continueEvolution, topEvolution = evolveBuildingCheck(topEvolution)
 		//Check if the topEvolution fits in the town.
 		if verifyBuildingFits(topEvolution, buildingMap, maxBuildings) &&
-			verifyTownWeight(topEvolution, townWeight) {
+			verifytownTier(topEvolution, townTier) {
 			topBuilding = topEvolution
 		}
 	}
@@ -253,6 +291,59 @@ func populateBuilding(building *PopulatedBuilding, peoplePerBuilding int, townNP
 
 	//spawnEmployeesForBuilding spawns NPC and non-NPC employees per the building's provided parameters. Otherwise it works against the default values provided by the town.
 	spawnEmployeesForBuilding(building, peoplePerBuilding, townNPCRatio)
+}
+
+//Bunch of stuff needed to save/load Location structs to/from disk as JSON encoded objects.
+type JSONLocation struct {
+	Name              string  `json:"name"`
+	Weight            int     `json:"weight"`
+	MinBuildings      int     `json:"minBuildings"`
+	MaxBuildings      int     `json:"maxBuildings"`
+	GrowthFactor      float64 `json:"growthFactor"`
+	NPCRatio          float64 `json:"npcRatio"`
+	PeoplePerBuilding int     `json:"peoplePerBuilding"`
+	TownTier          int     `json:"townTier"`
+}
+
+func (location Location) MarshalJSON() ([]byte, error) {
+	return json.Marshal(NewJSONLocation(location))
+}
+
+func (location *Location) UnmarshalJSON(data []byte) error {
+	var jsonLocation JSONLocation
+	if err := json.Unmarshal(data, &jsonLocation); err != nil {
+		return err
+	}
+	*location = jsonLocation.TranslateLocation()
+	return nil
+}
+
+func NewJSONLocation(location Location) JSONLocation {
+	return JSONLocation{location.WeightedItem.Name, location.WeightedItem.Weight, location.MinBuildings, location.MaxBuildings, location.GrowthFactor, location.NPCRatio, location.PeoplePerBuilding, location.TownTier}
+}
+
+func (jsonLocation JSONLocation) TranslateLocation() Location {
+	location := Location{}
+	location.WeightedItem.Name = jsonLocation.Name
+	location.WeightedItem.Weight = jsonLocation.Weight
+	location.MinBuildings = jsonLocation.MinBuildings
+	location.MaxBuildings = jsonLocation.MaxBuildings
+	location.GrowthFactor = jsonLocation.GrowthFactor
+	location.NPCRatio = jsonLocation.NPCRatio
+	location.PeoplePerBuilding = jsonLocation.PeoplePerBuilding
+	location.TownTier = jsonLocation.TownTier
+	return location
+}
+
+func tempWriteLocation(filename string) {
+	file, err := os.Create(filename)
+	errorHandler(err)
+	defer file.Close()
+	var jsonEncodedBuildings []byte
+	jsonEncodedBuildings, err = json.Marshal(TheLocations)
+	errorHandler(err)
+	_, err = file.Write(jsonEncodedBuildings)
+	errorHandler(err)
 }
 
 func errorHandler(err error) {

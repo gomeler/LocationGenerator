@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
 
 	"github.com/gomeler/LocationGenerator/generators"
@@ -21,34 +20,22 @@ var locationCmd = &cobra.Command{
 	Short: "Generate a location",
 	Run: func(cmd *cobra.Command, args []string) {
 		//Boy, I hope I'm handling flags correctly with Cobra. Think I've set it up correctly with this local flag "type".
-		var locationType int
 		locationTypeFlag = strings.ToLower(locationTypeFlag)
 		if locationTypeValidator(locationTypeFlag) {
-			switch locationTypeFlag {
-			case "random":
-				locationType = rand.Intn(4)
-			case "farm":
-				locationType = 0
-			case "hamlet":
-				locationType = 1
-			case "town":
-				locationType = 2
-			case "city":
-				locationType = 3
-			}
+			location := generators.LocationEntry(locationTypeFlag)
+			logLocation(location)
 		} else {
 			msg := fmt.Sprintf("Invalid input provided: %s", locationTypeFlag)
 			log.Fatal(msg)
 			panic(msg)
 		}
-		location := generators.LocationEntry(locationType)
-		logLocation(location)
 	},
 }
 
 //Validate that the given flag is a valid choice.
 func locationTypeValidator(flagInput string) bool {
-	validOptions := []string{"random", "farm", "hamlet", "town", "city"}
+	//Programmatically retrieve the valid locations from TheLocations keys.
+	validOptions := generators.GetLocationNames()
 	for _, val := range validOptions {
 		if flagInput == val {
 			return true
