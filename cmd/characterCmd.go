@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"LocationGenerator/logging"
 	"fmt"
 	"strings"
 
@@ -22,6 +23,14 @@ var characterCmd = &cobra.Command{
 	Use:   "character",
 	Short: "Generate a character",
 	Run: func(cmd *cobra.Command, args []string) {
+		//This is a clunky way of setting logging levels in different packages.
+		if Verbose {
+			logging.SetLevelDebug(log)
+			generators.SetLevelDebug()
+		} else {
+			logging.SetLevelInfo(log)
+			generators.SetLevelInfo()
+		}
 		//Do better flag validation via looping.
 		if raceFlagValidator(characterRaceFlag, generators.AssembleRaces()) {
 			if genderFlagValidator(characterGenderFlag, generators.Genders) {

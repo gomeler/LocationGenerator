@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"LocationGenerator/logging"
 	"fmt"
 	"strings"
 
@@ -19,7 +20,14 @@ var locationCmd = &cobra.Command{
 	Use:   "location",
 	Short: "Generate a location",
 	Run: func(cmd *cobra.Command, args []string) {
-		//Boy, I hope I'm handling flags correctly with Cobra. Think I've set it up correctly with this local flag "type".
+		//This is a clunky way of setting logging levels in different packages.
+		if Verbose {
+			logging.SetLevelDebug(log)
+			generators.SetLevelDebug()
+		} else {
+			logging.SetLevelInfo(log)
+			generators.SetLevelInfo()
+		}
 		locationTypeFlag = strings.ToLower(locationTypeFlag)
 		if locationTypeValidator(locationTypeFlag) {
 			location := generators.LocationEntry(locationTypeFlag)
@@ -36,6 +44,7 @@ var locationCmd = &cobra.Command{
 func locationTypeValidator(flagInput string) bool {
 	//Programmatically retrieve the valid locations from TheLocations keys.
 	validOptions := generators.GetLocationNames()
+	validOptions = append(validOptions, "random")
 	for _, val := range validOptions {
 		if flagInput == val {
 			return true

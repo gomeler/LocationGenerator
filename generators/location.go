@@ -16,6 +16,14 @@ import (
 
 var log = logging.New()
 
+func SetLevelDebug() {
+	logging.SetLevelDebug(log)
+}
+
+func SetLevelInfo() {
+	logging.SetLevelInfo(log)
+}
+
 type Location struct {
 	WeightedItem
 	MinBuildings      int
@@ -24,6 +32,14 @@ type Location struct {
 	NPCRatio          float64 //Ratio designed to reduce the number of pre-generated NPCs. To be adjusted in the future.
 	PeoplePerBuilding int     //Settling on 8 people/building unless defined in the building type.
 	TownTier          int
+}
+
+// Region is the largest unit we'll work with for now, and what represents the space that perhaps a kingdom or wilderness area would occupy. Regions will have master values for factions, existing wealth, population growth, and wealth growth that will be applied to underlying locations.
+type Region struct {
+	Name         string
+	Locations    [][]*PopulatedBuilding
+	Factions     string  //This is a stand-in for the regional faction system.
+	GrowthFactor float64 //To be used with events to age regions.
 }
 
 //TheLocations consists of a map of available locations. On init we'll load a default value that can be configured by the CLI, or programmatically from other functions. Not sure if we should have these global values present, seems like a good way to cause a mistake.
@@ -50,6 +66,16 @@ type PopulatedBuilding struct {
 	Employees       []NPC
 	NonNPCEmployees int
 	//Should probably account for things like wealth and inventory at some point.
+}
+
+// RegionEntry is a temporary stand-in for the development of the region system. I think a Region struct likely needs to be built for the return value, and as a means to more easily manage multiple regions.
+func RegionEntry(numberLocations int) Region {
+	var locations [][]*PopulatedBuilding = make([][]*PopulatedBuilding, numberLocations)
+	for i := 0; i < numberLocations; i++ {
+		locations[i] = LocationEntry("weightedrandom")
+	}
+	var region Region = Region{"Temporary name", locations, "temporary faction data", 0.0}
+	return region
 }
 
 func LocationEntry(locationName string) []*PopulatedBuilding {
@@ -84,13 +110,18 @@ func GetLocationNames() []string {
 //SelectRandomLocation will pull a random location from TheLocations, not factoring any weighting.
 func SelectRandomLocation() Location {
 	var locationNames = GetLocationNames()
-	var idx int = rand.Intn(len(locationNames) + 1)
+	var idx int = rand.Intn(len(locationNames))
 	return TheLocations[locationNames[idx]]
 }
 
 func selectLocation(locationName string) (Location, error) {
 	if locationName == "random" {
 		return SelectRandomLocation(), nil
+	} else if locationName == "weightedrandom" {
+		//Perform a weighted select to retrieve a location name, and then fall through to the confirmation and return of the location below.
+		selectedLocationName, error := LocationRandomWeightedSelect(TheLocations)
+		errorHandler(error)
+		locationName = selectedLocationName
 	}
 	if location, ok := TheLocations[locationName]; ok {
 		return location, nil
@@ -118,14 +149,14 @@ func generateBuildings(numBuildings int, townTier int, buildingMap []*WeightedBu
 	//loop to generate each building.
 	for i := 0; i < numBuildings; i++ {
 		building = selectBuilding(numBuildings, townTier, buildingMap, buildings)
-		log.Info(fmt.Sprintf("Building selected: %s.", building.Name))
+		log.Debug(fmt.Sprintf("Building selected: %s.", building.Name))
 		//check if building has child, so we can potentially evolve.
 		generatedBuilding = evolveBuildingLoop(*building, numBuildings, townTier, buildings)
 		buildings[generatedBuilding.Name]++
-		log.Info(fmt.Sprintf("Added %s to the map.", generatedBuilding.Name))
+		log.Debug(fmt.Sprintf("Added %s to the map.", generatedBuilding.Name))
 		discreteBuildings[i] = &PopulatedBuilding{BaseBuilding: generatedBuilding}
 	}
-	log.Info(buildings)
+	log.Debug(buildings)
 	return discreteBuildings
 }
 
@@ -146,14 +177,14 @@ func selectBuilding(numBuildings int,
 		candidateBuilding = buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
 		//Now check to see if the selected building fits within the townTier. We could avoid this check by feeding BuildingsRandomWeightedSelect with the townTier so we don't select an invalid option.
 		if verifytownTier(candidateBuilding, townTier) {
-			log.Info(fmt.Sprintf("%s with tier %d fits in townTier %d.",
+			log.Debug(fmt.Sprintf("%s with tier %d fits in townTier %d.",
 				candidateBuilding.Name,
 				candidateBuilding.MinCityWeight,
 				townTier))
 			//Check to see if there is space in the town for the building.
 			if verifyBuildingFits(buildingCollections[buildingCollectionIdx].Buildings[buildingIdx],
 				existingBuildings, numBuildings) {
-				log.Info(fmt.Sprintf("%s fits within the town.", candidateBuilding.Name))
+				log.Debug(fmt.Sprintf("%s fits within the town.", candidateBuilding.Name))
 				return &buildingCollections[buildingCollectionIdx].Buildings[buildingIdx]
 			}
 			//Seriously just an excuse to test out strings.NewReplacer
@@ -163,9 +194,9 @@ func selectBuilding(numBuildings int,
 				"{MaxQuantity}", fmt.Sprint(candidateBuilding.MaxQuantity),
 				"{MaxPercentage}", fmt.Sprint(candidateBuilding.MaximumPercentage),
 				"{NumBuildings}", fmt.Sprint(existingBuildings[candidateBuilding.Name]))
-			log.Info(r.Replace(message))
+			log.Debug(r.Replace(message))
 		} else {
-			log.Info(fmt.Sprintf("%s does not fit in townTier %d, rerolling.", candidateBuilding.Name, townTier))
+			log.Debug(fmt.Sprintf("%s does not fit in townTier %d, rerolling.", candidateBuilding.Name, townTier))
 			return selectBuilding(numBuildings, townTier, buildingCollections, existingBuildings)
 		}
 	}
@@ -200,7 +231,7 @@ func verifyBuildingFits(building WeightedBuilding,
 	//Verify we won't exceed MaxQuantity. MaxQuantity is 0 by default, ignore those cases.
 	if building.MaxQuantity < (existingBuildings[building.Name]+1) &&
 		building.MaxQuantity != 0 {
-		log.Info(fmt.Sprintf("%s failed MaxQuantity check with MaxQuantity of %d and %d already available.", building.Name, building.MaxQuantity, existingBuildings[building.Name]))
+		log.Debug(fmt.Sprintf("%s failed MaxQuantity check with MaxQuantity of %d and %d already available.", building.Name, building.MaxQuantity, existingBuildings[building.Name]))
 		return false
 	}
 	//For exceedingly small locations a low MaximumPercentage basically means nothing spawns, so we'll loosen the limit and basically create a MinQuantity=1 by default.
@@ -211,7 +242,7 @@ func verifyBuildingFits(building WeightedBuilding,
 	//Verify we won't exceed MaximumPercentage. MaximumPercentage is 0 by default, ignore those cases.
 	if int(math.Round(maxPercentageAppliedQuantity)) < (existingBuildings[building.Name]+1) &&
 		building.MaximumPercentage != 0 {
-		log.Info(fmt.Sprintf("%s failed MaxPercentage check with MaxPercentage of %d, an applied maximumQuantity of %d, and %d already available.", building.Name, building.MaximumPercentage, int(math.Round(maxPercentageAppliedQuantity)), existingBuildings[building.Name]))
+		log.Debug(fmt.Sprintf("%s failed MaxPercentage check with MaxPercentage of %d, an applied maximumQuantity of %d, and %d already available.", building.Name, building.MaximumPercentage, int(math.Round(maxPercentageAppliedQuantity)), existingBuildings[building.Name]))
 		return false
 	}
 	return true
@@ -234,7 +265,7 @@ func evolveBuildingLoop(building WeightedBuilding, maxBuildings int, townTier in
 	}
 	if topBuilding != topEvolution {
 		//This is strictly for my curiousity.
-		log.Info(fmt.Sprintf("Turns out we rolled back %s to %s due to space.", topEvolution.Name, topBuilding.Name))
+		log.Debug(fmt.Sprintf("Turns out we rolled back %s to %s due to space.", topEvolution.Name, topBuilding.Name))
 	}
 	return &topBuilding
 }
@@ -245,11 +276,11 @@ func evolveBuildingCheck(building WeightedBuilding) (bool, WeightedBuilding) {
 	//Perform a roll to see if the childBuilding replaces the existing building. We return the child on success, otherwise we return the original value.
 	if building.ChildChance > randomSelect {
 		//Child evolution success, return the child.
-		log.Info(fmt.Sprintf("Child evolution success: evolved %s into %s.", building.Name, building.ChildBuilding.Name))
+		log.Debug(fmt.Sprintf("Child evolution success: evolved %s into %s.", building.Name, building.ChildBuilding.Name))
 		return true, *building.ChildBuilding
 	}
 	//Child evolution failure, we're done evolving things.
-	log.Info(fmt.Sprintf("Child evolution failure for %s.", building.Name))
+	log.Debug(fmt.Sprintf("Child evolution failure for %s.", building.Name))
 	return false, building
 }
 

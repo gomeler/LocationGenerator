@@ -138,7 +138,7 @@ func SemiNormalDistributionAgeGenerator(race Race) int {
 	var sample = int(math.Round(rand.NormFloat64()*race.ageSigma + race.ageMean))
 	if sample < int(math.Round(race.ageMean-(race.ageSigmaFactor*race.ageSigma))) {
 		//generated too small of a sample. Retry.
-		fmt.Println("Generated too small of a result: ", sample)
+		//fmt.Println("Generated too small of a result: ", sample)
 		sample = SemiNormalDistributionAgeGenerator(race)
 	}
 	return sample

@@ -11,6 +11,14 @@ func New() *log.Logger {
 	logger := log.New()
 	logger.SetFormatter(&log.JSONFormatter{})
 	logger.SetOutput(os.Stdout)
-	logger.SetLevel(log.DebugLevel)
+	logger.SetLevel(log.InfoLevel)
 	return logger
+}
+
+func SetLevelDebug(theLogger *log.Logger) {
+	theLogger.SetLevel(log.DebugLevel)
+}
+
+func SetLevelInfo(theLogger *log.Logger) {
+	theLogger.SetLevel(log.InfoLevel)
 }

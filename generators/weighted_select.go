@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -169,4 +170,18 @@ func BuildingsRandomWeightedSelect(buildings []WeightedBuilding) (int, error) {
 		items[idx] = collection.WeightedItem
 	}
 	return RandomWeightedSelect(items)
+}
+
+func LocationRandomWeightedSelect(locations map[string]Location) (string, error) {
+	items := make([]WeightedItem, len(locations))
+	names := make([]string, len(locations))
+	var idx int
+	for _, value := range locations {
+		items[idx] = value.WeightedItem
+		names[idx] = value.WeightedItem.Name
+		idx++
+	}
+	selectedIdx, error := RandomWeightedSelect(items)
+	// Using lowercase across the project for map keys.
+	return strings.ToLower(names[selectedIdx]), error
 }
